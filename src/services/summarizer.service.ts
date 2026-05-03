@@ -2,7 +2,7 @@
  * Summarizer Service
  * ──────────────────
  * Generates and updates conversation summaries.
- * Uses OLLAMA ONLY (never Gemini) to preserve free-tier quota.
+ * Uses Groq (via LLMService) to handle background tasks.
  * Fixes the old bugs:
  *   - Uses last 20 MESSAGES (not 20 characters)
  *   - Uses atomic $set update (not full document .save())
@@ -10,7 +10,7 @@
 
 import { logger } from "../utils/logger";
 import { ChatSession } from "../models/ChatSession";
-import { ollamaGenerate } from "./ollama.service";
+import { generate } from "./llm.service";
 import { formatMessagesForPrompt, SimpleMessage } from "./memory.service";
 
 // ── Configuration ──────────────────────────────────────────────
@@ -56,7 +56,7 @@ export function shouldUpdateSummary(
 
 // ── Generate & Save Summary ────────────────────────────────────
 /**
- * Generates a new summary using Ollama and saves it atomically.
+ * Generates a new summary using Groq and saves it atomically.
  * Uses $set to avoid the race condition that existed with .save().
  */
 export async function updateSummary(
@@ -71,13 +71,13 @@ export async function updateSummary(
 
     const prompt = buildSummarizationPrompt(conversationText, existingSummary);
 
-    logger.info("📝 Summarizer: generating summary via Ollama", {
+    logger.info("📝 Summarizer: generating summary via Groq", {
       sessionId,
       inputMessages: recentForSummary.length,
     });
 
-    const newSummary = await ollamaGenerate(prompt, {
-      num_predict: SUMMARY_MAX_TOKENS,
+    const newSummary = await generate(prompt, {
+      maxTokens: SUMMARY_MAX_TOKENS,
       temperature: 0.3,
     });
 
@@ -98,20 +98,20 @@ export async function updateSummary(
 }
 
 // ── Generate Session Title ─────────────────────────────────────
-/**
- * Generates a short title for the session using Ollama.
- * Returns null if generation fails (non-critical).
- */
-export async function generateTitle(
-  userMsg: string,
-  aiMsg: string
-): Promise<string | null> {
-  try {
-    const prompt = buildTitlePrompt(userMsg, aiMsg);
-    const title = await ollamaGenerate(prompt, {
-      num_predict: 12,
-      temperature: 0.3,
-    });
+  /**
+   * Generates a short title for the session using Groq.
+   * Returns null if generation fails (non-critical).
+   */
+  export async function generateTitle(
+    userMsg: string,
+    aiMsg: string
+  ): Promise<string | null> {
+    try {
+      const prompt = buildTitlePrompt(userMsg, aiMsg);
+      const title = await generate(prompt, {
+        maxTokens: 12,
+        temperature: 0.3,
+      });
     const cleaned = title.replace(/^["']|["']$/g, "").trim();
     return cleaned.length > 2 ? cleaned : null;
   } catch {

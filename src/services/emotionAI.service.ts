@@ -1,5 +1,5 @@
 import { logger } from "../utils/logger";
-import { groq1 } from "./llm.service";
+import { groq1, groq2 } from "./llm.service";
 
 const MODEL_NAME = "llama-3.1-8b-instant";
 
@@ -79,39 +79,48 @@ Recent context: "${params.recentMessages}"
 Summary: "${params.sessionSummary}"
 Mood: "${params.latestMood}"`;
 
-  try {
-    logger.info("🧠 emotionAI: Running Groq analysis...");
-    
-    const completion = await groq1.chat.completions.create({
-      model: MODEL_NAME,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      max_tokens: 80,
-      temperature: 0.1,
-      response_format: { type: "json_object" }
-    }, {
-      timeout: 1500 // VERY strict 1.5s timeout
-    });
+  const keys = [groq1, groq2];
+  let lastError: any = null;
 
-    const text = completion.choices[0]?.message?.content || "{}";
-    const data = JSON.parse(text);
+  for (let i = 0; i < keys.length; i++) {
+    const groq = keys[i];
+    try {
+      logger.info(`🧠 emotionAI: Running Groq analysis (Key ${i + 1})...`);
+      
+      const completion = await groq.chat.completions.create({
+        model: MODEL_NAME,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        max_tokens: 80,
+        temperature: 0.1,
+        response_format: { type: "json_object" }
+      }, {
+        timeout: 1500 // VERY strict 1.5s timeout
+      });
 
-    const finalResult: EmotionAIResult = {
-      emotion: data.emotion || "neutral",
-      intensity: data.intensity || 0.1,
-      suggestedActivity: (data.suggestedActivity === "null" || !data.suggestedActivity) ? null : data.suggestedActivity,
-      autoTrigger: data.autoTrigger || false
-    };
+      const text = completion.choices[0]?.message?.content || "{}";
+      const data = JSON.parse(text);
 
-    logger.info("✅ emotionAI: Groq Complete", finalResult);
-    return finalResult;
-    
-  } catch (error) {
-    logger.warn("⚠️ emotionAI: Groq failed, using heuristic fallback", { 
-      error: error instanceof Error ? error.message : String(error) 
-    });
-    return fallbackAnalysis(params.userMessage, params.latestMood);
+      const finalResult: EmotionAIResult = {
+        emotion: data.emotion || "neutral",
+        intensity: data.intensity || 0.1,
+        suggestedActivity: (data.suggestedActivity === "null" || !data.suggestedActivity) ? null : data.suggestedActivity,
+        autoTrigger: data.autoTrigger || false
+      };
+
+      logger.info(`✅ emotionAI: Groq Key ${i + 1} Complete`, finalResult);
+      return finalResult;
+      
+    } catch (error) {
+      lastError = error;
+      logger.warn(`⚠️ emotionAI: Groq Key ${i + 1} failed, ${i === 0 ? 'switching...' : 'falling back to heuristic'}`, { 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
   }
+
+  // If both keys fail, use heuristic
+  return fallbackAnalysis(params.userMessage, params.latestMood);
 }

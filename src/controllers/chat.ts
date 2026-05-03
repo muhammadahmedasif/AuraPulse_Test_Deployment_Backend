@@ -201,7 +201,7 @@ export const sendMessage = async (req: Request, res: Response) => {
         messageCount: updatedSession.messages.length,
       });
 
-      // ── Background: Title Generation (Ollama only) ──
+      // ── Background: Title Generation (Groq) ──
       const isDefaultTitle =
         updatedSession.title === "New Session" ||
         updatedSession.title === "New Therapy Session";
@@ -218,7 +218,7 @@ export const sendMessage = async (req: Request, res: Response) => {
           .catch((err) => logger.error("Title generation error", err));
       }
 
-      // ── Background: Summary Update (Ollama only) ──
+      // ── Background: Summary Update (Groq) ──
       const msgCount = updatedSession.messages.length;
       const hasSummary = !!updatedSession.summary;
 
