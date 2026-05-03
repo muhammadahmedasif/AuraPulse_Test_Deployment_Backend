@@ -1,14 +1,7 @@
 {
   "buildCommand": "npm run build",
-  "startCommand": "npm start",
   "env": {
     "NODE_ENV": "production"
   },
-  "regions": ["iad1"],
-  "functions": {
-    "src/index.ts": {
-      "memory": 1024,
-      "maxDuration": 30
-    }
-  }
+  "regions": ["iad1"]
 }
