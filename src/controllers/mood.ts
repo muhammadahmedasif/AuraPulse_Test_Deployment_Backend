@@ -9,9 +9,21 @@ export const createMood = async (
   res: Response,
   next: NextFunction
 ) => {
+  console.log("---- REQUEST DEBUG (createMood) ----");
+  console.log("BODY:", req.body);
+  console.log("USER:", req.user);
+  console.log("PARAMS:", req.params);
+
+  if (!req.user) {
+    console.error("USER UNDEFINED - AUTH FAILED");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   try {
     const { score, note } = req.body;
     const userId = req.user._id;
+
+    console.log("Saving mood for user:", userId);
 
     const mood = new Mood({
       userId,
@@ -27,8 +39,13 @@ export const createMood = async (
       success: true,
       data: mood,
     });
-  } catch (error) {
-    next(error);
+  } catch (err: any) {
+    console.error("ERROR (createMood):", err);
+    res.status(500).json({
+      message: "Internal error",
+      error: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined
+    });
   }
 };
 
@@ -38,6 +55,15 @@ export const getMoodHistory = async (
   res: Response,
   next: NextFunction
 ) => {
+  console.log("---- REQUEST DEBUG (getMoodHistory) ----");
+  console.log("QUERY:", req.query);
+  console.log("USER:", req.user);
+
+  if (!req.user) {
+    console.error("USER UNDEFINED - AUTH FAILED");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   try {
     const userId = req.user._id;
 
@@ -67,8 +93,13 @@ export const getMoodHistory = async (
       success: true,
       data: moods,
     });
-  } catch (error) {
-    next(error);
+  } catch (err: any) {
+    console.error("ERROR (getMoodHistory):", err);
+    res.status(500).json({
+      message: "Internal error",
+      error: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined
+    });
   }
 };
 
@@ -78,6 +109,15 @@ export const getMoodStats = async (
   res: Response,
   next: NextFunction
 ) => {
+  console.log("---- REQUEST DEBUG (getMoodStats) ----");
+  console.log("QUERY:", req.query);
+  console.log("USER:", req.user);
+
+  if (!req.user) {
+    console.error("USER UNDEFINED - AUTH FAILED");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   try {
     const userId = req.user._id;
 
@@ -129,7 +169,12 @@ export const getMoodStats = async (
       success: true,
       data: result,
     });
-  } catch (error) {
-    next(error);
+  } catch (err: any) {
+    console.error("ERROR (getMoodStats):", err);
+    res.status(500).json({
+      message: "Internal error",
+      error: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined
+    });
   }
 };

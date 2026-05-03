@@ -7,6 +7,15 @@ import { uploadImage } from "../services/cloudinary.service";
  * Update user profile details (name, email, profileImage)
  */
 export const updateProfile: RequestHandler = async (req, res) => {
+  console.log("---- REQUEST DEBUG (updateProfile) ----");
+  console.log("BODY:", req.body);
+  console.log("USER:", req.user);
+
+  if (!req.user) {
+    console.error("USER UNDEFINED - AUTH FAILED");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   try {
     const userId = req.user._id;
     const { name, email, profileImage, aiName, aiBehavior, aiAvatar } = req.body;
@@ -33,11 +42,12 @@ export const updateProfile: RequestHandler = async (req, res) => {
       message: "Profile updated successfully",
       user,
     });
-  } catch (error) {
-    logger.error("Error updating profile:", error);
+  } catch (err: any) {
+    console.error("ERROR (updateProfile):", err);
     res.status(500).json({
-      message: "Error updating profile",
-      error: error instanceof Error ? error.message : "Unknown error",
+      message: "Internal error",
+      error: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined
     });
   }
 };
@@ -46,6 +56,14 @@ export const updateProfile: RequestHandler = async (req, res) => {
  * Get current user profile
  */
 export const getProfile: RequestHandler = async (req, res) => {
+  console.log("---- REQUEST DEBUG (getProfile) ----");
+  console.log("USER:", req.user);
+
+  if (!req.user) {
+    console.error("USER UNDEFINED - AUTH FAILED");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   try {
     const userId = req.user._id;
     const user = await User.findById(userId).select("-password");
@@ -55,11 +73,12 @@ export const getProfile: RequestHandler = async (req, res) => {
     }
 
     res.status(200).json(user);
-  } catch (error) {
-    logger.error("Error fetching profile:", error);
+  } catch (err: any) {
+    console.error("ERROR (getProfile):", err);
     res.status(500).json({
-      message: "Error fetching profile",
-      error: error instanceof Error ? error.message : "Unknown error",
+      message: "Internal error",
+      error: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined
     });
   }
 };
@@ -68,6 +87,15 @@ export const getProfile: RequestHandler = async (req, res) => {
  * Upload profile avatar to Cloudinary
  */
 export const uploadAvatar: RequestHandler = async (req, res) => {
+  console.log("---- REQUEST DEBUG (uploadAvatar) ----");
+  console.log("FILE:", req.file);
+  console.log("USER:", req.user);
+
+  if (!req.user) {
+    console.error("USER UNDEFINED - AUTH FAILED");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   try {
     if (!req.file) {
       return res.status(400).json({ message: "No image file provided" });
@@ -80,11 +108,12 @@ export const uploadAvatar: RequestHandler = async (req, res) => {
       message: "Image uploaded successfully",
       imageUrl,
     });
-  } catch (error) {
-    logger.error("Error uploading avatar:", error);
+  } catch (err: any) {
+    console.error("ERROR (uploadAvatar):", err);
     res.status(500).json({
-      message: "Error uploading avatar",
-      error: error instanceof Error ? error.message : "Unknown error",
+      message: "Internal error",
+      error: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined
     });
   }
 };
@@ -92,6 +121,15 @@ export const uploadAvatar: RequestHandler = async (req, res) => {
  * Upload AI avatar to Cloudinary
  */
 export const uploadAiAvatar: RequestHandler = async (req, res) => {
+  console.log("---- REQUEST DEBUG (uploadAiAvatar) ----");
+  console.log("FILE:", req.file);
+  console.log("USER:", req.user);
+
+  if (!req.user) {
+    console.error("USER UNDEFINED - AUTH FAILED");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   try {
     if (!req.file) {
       return res.status(400).json({ message: "No image file provided" });
@@ -104,11 +142,12 @@ export const uploadAiAvatar: RequestHandler = async (req, res) => {
       message: "AI Avatar uploaded successfully",
       imageUrl,
     });
-  } catch (error) {
-    logger.error("Error uploading AI avatar:", error);
+  } catch (err: any) {
+    console.error("ERROR (uploadAiAvatar):", err);
     res.status(500).json({
-      message: "Error uploading AI avatar",
-      error: error instanceof Error ? error.message : "Unknown error",
+      message: "Internal error",
+      error: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined
     });
   }
 };

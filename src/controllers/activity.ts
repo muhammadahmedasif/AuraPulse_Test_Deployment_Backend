@@ -8,9 +8,20 @@ export const logActivity = async (
   res: Response,
   next: NextFunction
 ) => {
+  console.log("---- REQUEST DEBUG (logActivity) ----");
+  console.log("BODY:", req.body);
+  console.log("USER:", req.user);
+
+  if (!req.user) {
+    console.error("USER UNDEFINED - AUTH FAILED");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   try {
     const { type, name, description, duration } = req.body;
     const userId = req.user._id;
+
+    console.log("Saving activity for user:", userId);
 
     const activity = new Activity({
       userId,
@@ -28,8 +39,13 @@ export const logActivity = async (
       success: true,
       data: activity,
     });
-  } catch (error) {
-    next(error);
+  } catch (err: any) {
+    console.error("ERROR (logActivity):", err);
+    res.status(500).json({
+      message: "Internal error",
+      error: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined
+    });
   }
 };
 
@@ -39,6 +55,14 @@ export const getActivities = async (
   res: Response,
   next: NextFunction
 ) => {
+  console.log("---- REQUEST DEBUG (getActivities) ----");
+  console.log("USER:", req.user);
+
+  if (!req.user) {
+    console.error("USER UNDEFINED - AUTH FAILED");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   try {
     const userId = req.user._id;
 
@@ -48,8 +72,13 @@ export const getActivities = async (
       success: true,
       data: activities,
     });
-  } catch (error) {
-    next(error);
+  } catch (err: any) {
+    console.error("ERROR (getActivities):", err);
+    res.status(500).json({
+      message: "Internal error",
+      error: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined
+    });
   }
 };
 
@@ -59,6 +88,14 @@ export const getTodayActivities = async (
   res: Response,
   next: NextFunction
 ) => {
+  console.log("---- REQUEST DEBUG (getTodayActivities) ----");
+  console.log("USER:", req.user);
+
+  if (!req.user) {
+    console.error("USER UNDEFINED - AUTH FAILED");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   try {
     const userId = req.user._id;
 
@@ -77,8 +114,13 @@ export const getTodayActivities = async (
       success: true,
       data: activities,
     });
-  } catch (error) {
-    next(error);
+  } catch (err: any) {
+    console.error("ERROR (getTodayActivities):", err);
+    res.status(500).json({
+      message: "Internal error",
+      error: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined
+    });
   }
 };
 
