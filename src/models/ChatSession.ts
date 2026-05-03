@@ -1,4 +1,4 @@
-import { Document, Schema, model, Types } from "mongoose";
+import mongoose, { Document, Schema, model, Types } from "mongoose";
 import { MessageAnalysis } from "../types";
 
 export interface IChatMessage {
@@ -54,7 +54,7 @@ const chatSessionSchema = new Schema<IChatSession>({
   messages: [chatMessageSchema],
 });
 
-export const ChatSession = model<IChatSession>(
+export const ChatSession = mongoose.models.ChatSession || model<IChatSession>(
   "ChatSession",
   chatSessionSchema
 );
