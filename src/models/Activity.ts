@@ -59,4 +59,4 @@ const activitySchema = new Schema<IActivity>(
 // Index for efficient querying
 activitySchema.index({ userId: 1, timestamp: -1 });
 
-export const Activity = mongoose.models.Activity || mongoose.model<IActivity>("Activity", activitySchema);
+export const Activity = mongoose.model<IActivity>("Activity", activitySchema);
