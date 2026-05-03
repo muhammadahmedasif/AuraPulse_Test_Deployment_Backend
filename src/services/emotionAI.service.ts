@@ -1,10 +1,7 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { logger } from "../utils/logger";
-import { ollamaGenerate } from "./ollama.service";
+import { groq1 } from "./llm.service";
 
-// Initialize Gemini SDK once
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const MODEL_NAME = "gemini-2.0-flash-lite";
+const MODEL_NAME = "llama-3.1-8b-instant";
 
 // ── Types ──────────────────────────────────────────────────────
 export interface EmotionAIParams {
@@ -19,6 +16,15 @@ export interface EmotionAIResult {
   intensity: number;
   suggestedActivity: "breathing" | "ocean" | "forest" | "zen" | null;
   autoTrigger: boolean;
+}
+
+// ── Smart Gate ────────────────────────────────────────────────
+function isGreeting(message: string): boolean {
+  const greetings = ["hi", "hello", "hey", "hola", "greetings", "yo", "morning", "evening", "night"];
+  const trimmed = message.trim().toLowerCase();
+  // Remove punctuation for better matching
+  const clean = trimmed.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
+  return greetings.includes(clean);
 }
 
 // ── Fallback Heuristic ─────────────────────────────────────────
@@ -46,6 +52,12 @@ function fallbackAnalysis(message: string, latestMood: string): EmotionAIResult 
 
 // ── Main Analysis Function ─────────────────────────────────────
 export async function analyzeUserState(params: EmotionAIParams): Promise<EmotionAIResult> {
+  // ── Smart Gate ──
+  if (params.userMessage.length < 5 || isGreeting(params.userMessage)) {
+    logger.info("🧠 emotionAI: Smart Gate triggered, using heuristic");
+    return fallbackAnalysis(params.userMessage, params.latestMood);
+  }
+
   const systemPrompt = `You are an emotion analysis engine.
 Analyze emotional state based on context.
 Return ONLY valid JSON with this exact structure:
@@ -67,99 +79,39 @@ Recent context: "${params.recentMessages}"
 Summary: "${params.sessionSummary}"
 Mood: "${params.latestMood}"`;
 
-  const prompt = systemPrompt + "\n\n" + userPrompt;
-
   try {
-    const model = genAI.getGenerativeModel({
+    logger.info("🧠 emotionAI: Running Groq analysis...");
+    
+    const completion = await groq1.chat.completions.create({
       model: MODEL_NAME,
-      generationConfig: {
-        maxOutputTokens: 100,
-        temperature: 0.2, // Low temperature for stable classification
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: SchemaType.OBJECT,
-          properties: {
-            emotion: {
-              type: SchemaType.STRING,
-              description: "The primary emotional state of the user. Must be one of: panic, stress, low, neutral, positive."
-            },
-            intensity: {
-              type: SchemaType.NUMBER,
-              description: "Intensity of the emotion on a scale of 0.0 to 1.0."
-            },
-            suggestedActivity: {
-              type: SchemaType.STRING,
-              description: "Suggested activity. Must be one of: breathing, ocean, forest, zen, null. Return 'null' string if neutral or positive."
-            },
-            autoTrigger: {
-              type: SchemaType.BOOLEAN,
-              description: "True if intensity > 0.7 OR latestMood is low."
-            }
-          },
-          required: ["emotion", "intensity", "suggestedActivity", "autoTrigger"]
-        }
-      },
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      max_tokens: 80,
+      temperature: 0.1,
+      response_format: { type: "json_object" }
+    }, {
+      timeout: 1500 // VERY strict 1.5s timeout
     });
 
-    logger.info("🧠 emotionAI: Running analysis...");
-    
-    // Set a very tight timeout for the non-critical background task
-    const timeoutController = new AbortController();
-    const timeout = setTimeout(() => timeoutController.abort(), 3000);
-
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }]
-    });
-    
-    clearTimeout(timeout);
-
-    const text = result.response.text();
+    const text = completion.choices[0]?.message?.content || "{}";
     const data = JSON.parse(text);
 
     const finalResult: EmotionAIResult = {
-      emotion: data.emotion,
-      intensity: data.intensity,
-      suggestedActivity: data.suggestedActivity === "null" ? null : data.suggestedActivity,
-      autoTrigger: data.autoTrigger
+      emotion: data.emotion || "neutral",
+      intensity: data.intensity || 0.1,
+      suggestedActivity: (data.suggestedActivity === "null" || !data.suggestedActivity) ? null : data.suggestedActivity,
+      autoTrigger: data.autoTrigger || false
     };
 
-    logger.info("✅ emotionAI: Gemini Complete", finalResult);
+    logger.info("✅ emotionAI: Groq Complete", finalResult);
     return finalResult;
     
   } catch (error) {
-    logger.warn("⚠️ emotionAI: Gemini failed, attempting Ollama fallback", { 
+    logger.warn("⚠️ emotionAI: Groq failed, using heuristic fallback", { 
       error: error instanceof Error ? error.message : String(error) 
     });
-
-    try {
-      // Use a strict 3-second timeout for the Ollama fallback too
-      const ollamaText = await Promise.race([
-        ollamaGenerate(prompt, { temperature: 0.1 }),
-        new Promise<string>((_, reject) => 
-          setTimeout(() => reject(new Error("Ollama timeout")), 3000)
-        )
-      ]);
-
-      // Extract JSON in case Ollama wraps it in markdown blocks
-      const jsonMatch = ollamaText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("No JSON found in Ollama response");
-
-      const data = JSON.parse(jsonMatch[0]);
-      
-      const finalResult: EmotionAIResult = {
-        emotion: data.emotion,
-        intensity: data.intensity,
-        suggestedActivity: data.suggestedActivity === "null" ? null : data.suggestedActivity,
-        autoTrigger: data.autoTrigger
-      };
-
-      logger.info("✅ emotionAI: Ollama Fallback Complete", finalResult);
-      return finalResult;
-    } catch (ollamaError) {
-      logger.error("🔴 emotionAI: Ollama fallback failed, using heuristic", {
-        error: ollamaError instanceof Error ? ollamaError.message : String(ollamaError)
-      });
-      return fallbackAnalysis(params.userMessage, params.latestMood);
-    }
+    return fallbackAnalysis(params.userMessage, params.latestMood);
   }
 }

@@ -6,7 +6,7 @@
  */
 
 // ── Constants ──────────────────────────────────────────────────
-const MAX_RECENT_MESSAGES = 8; // 4 user + 4 assistant turns
+const MAX_RECENT_MESSAGES = 6; // 3 user + 3 assistant turns
 const MAX_MESSAGE_LENGTH = 400; // truncate individual messages
 
 // ── Types ──────────────────────────────────────────────────────

@@ -4,14 +4,15 @@ import { generateStream } from "./llm.service";
 // ── Router Result ──────────────────────────────────────────────
 export interface RouterResult {
   fullText: string;
-  modelUsed: "groq" | "ollama"; // Updated from gemini to groq
+  modelUsed: "groq";
   fallbackUsed: boolean;
+  error?: boolean;
 }
 
 // ── Main Router (Simplified) ───────────────────────────────────
 /**
  * Now delegates everything to llm.service.ts which handles
- * the Groq -> Ollama fallback logic internally.
+ * the dual-key Groq failover logic internally.
  * 
  * Maintains signature to avoid breaking chat controller.
  */
@@ -19,8 +20,7 @@ export async function routedGenerateStream(
   prompt: string,
   onChunk: (text: string) => void,
   options: {
-    primaryMaxTokens?: number; // Renamed from geminiMaxTokens
-    ollamaMaxTokens?: number;
+    primaryMaxTokens?: number;
     temperature?: number;
   } = {},
   signal?: AbortSignal
@@ -39,7 +39,8 @@ export async function routedGenerateStream(
 
   return {
     fullText: result.fullText,
-    modelUsed: result.modelUsed,
-    fallbackUsed: result.fallbackUsed
+    modelUsed: result.modelUsed as "groq",
+    fallbackUsed: result.fallbackUsed,
+    error: result.error
   };
 }

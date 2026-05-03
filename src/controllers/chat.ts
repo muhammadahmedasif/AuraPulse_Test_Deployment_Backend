@@ -136,7 +136,7 @@ export const sendMessage = async (req: Request, res: Response) => {
 
     // ── Generate AI response via router ──
     // This starts streaming immediately to res
-    const { fullText, modelUsed, fallbackUsed } = await routedGenerateStream(
+    const { fullText, modelUsed, fallbackUsed, error: llmError } = await routedGenerateStream(
       prompt,
       (chunk) => {
         if (!res.writableEnded) {
@@ -145,7 +145,6 @@ export const sendMessage = async (req: Request, res: Response) => {
       },
       {
         primaryMaxTokens: 250,
-        ollamaMaxTokens: 200,
         temperature: 0.7,
       },
       abortController.signal
@@ -244,6 +243,7 @@ export const sendMessage = async (req: Request, res: Response) => {
         analysis: defaultAnalysis,
         modelUsed,
         fallbackUsed,
+        error: llmError,
         metadata: {
           progress: {
             emotionalState: defaultAnalysis.emotionalState,
