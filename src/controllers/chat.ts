@@ -334,7 +334,10 @@ export const getChatHistory = async (req: Request, res: Response) => {
 export const getUserSessions = async (req: Request, res: Response) => {
   try {
     const userId = req.user._id;
-    const sessions = await ChatSession.find({ userId })
+    const sessions = await ChatSession.find({ 
+      userId,
+      "messages.0": { $exists: true }
+    })
       .select("sessionId title startTime status messages")
       .sort({ startTime: -1 });
 
