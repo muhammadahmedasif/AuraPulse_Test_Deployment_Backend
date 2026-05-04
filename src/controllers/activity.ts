@@ -8,10 +8,6 @@ export const logActivity = async (
   res: Response,
   next: NextFunction
 ) => {
-  console.log("---- REQUEST DEBUG (logActivity) ----");
-  console.log("BODY:", req.body);
-  console.log("USER:", req.user);
-
   if (!req.user) {
     console.error("USER UNDEFINED - AUTH FAILED");
     return res.status(401).json({ error: "Unauthorized" });
@@ -21,7 +17,6 @@ export const logActivity = async (
     const { type, name, description, duration } = req.body;
     const userId = req.user._id;
 
-    console.log("Saving activity for user:", userId);
 
     const activity = new Activity({
       userId,
@@ -55,9 +50,6 @@ export const getActivities = async (
   res: Response,
   next: NextFunction
 ) => {
-  console.log("---- REQUEST DEBUG (getActivities) ----");
-  console.log("USER:", req.user);
-
   if (!req.user) {
     console.error("USER UNDEFINED - AUTH FAILED");
     return res.status(401).json({ error: "Unauthorized" });
@@ -88,9 +80,6 @@ export const getTodayActivities = async (
   res: Response,
   next: NextFunction
 ) => {
-  console.log("---- REQUEST DEBUG (getTodayActivities) ----");
-  console.log("USER:", req.user);
-
   if (!req.user) {
     console.error("USER UNDEFINED - AUTH FAILED");
     return res.status(401).json({ error: "Unauthorized" });

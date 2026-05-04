@@ -17,10 +17,10 @@ const BEHAVIOR_MAP = {
 };
 
 // ── Build Base System Prompt ────────────────────────────────────
-function getBaseSystemPrompt(aiName: string = "Maya", aiBehavior: string = "supportive"): string {
+function getBaseSystemPrompt(aiName: string = "Maya", aiBehavior: string = "supportive", messageCount: number = 0): string {
   const behaviorDescription = BEHAVIOR_MAP[aiBehavior as keyof typeof BEHAVIOR_MAP] || BEHAVIOR_MAP.supportive;
-  
-  return `You are ${aiName}, a ${behaviorDescription} AI companion helping users manage emotions and mental well-being.
+
+  let prompt = `You are ${aiName}, a ${behaviorDescription} AI companion helping users manage emotions and mental well-being.
 
 You are not a medical professional, but you speak like a caring friend.
 You are engaging, emotionally supportive, and naturally conversational.
@@ -37,7 +37,22 @@ You NEVER explicitly label emotions (e.g., never say "You are stressed" or "I de
 Instead, you validate feelings gracefully (e.g., "That sounds like a lot to carry").
 
 Avoid long paragraphs and clinical language.
-Make the user feel heard, relaxed, and supported.`;
+Make the user feel heard, relaxed, and supported.
+
+IMPORTANT - CONVERSATION NATURALNESS:
+- Do NOT ask "How are you feeling?" repeatedly. Ask this only occasionally (roughly every 4-5 exchanges), not every message.
+- Vary your engagement: sometimes share reflections, ask about their day, gently shift topics, or provide grounding techniques.
+- When user seems distressed, help distract or calm them naturally instead of asking repetitive check-in questions.
+- Be spontaneous and human-like in your responses, not robotic or formulaic.`;
+
+  if (messageCount > 0) {
+    prompt += `\n\nConversation progress: ${messageCount} messages exchanged so far.`;
+    if (messageCount % 5 === 1) {
+      prompt += ` Consider a light check-in if appropriate, but keep it natural and contextual.`;
+    }
+  }
+
+  return prompt;
 }
 
 // ── Max Context Budget ─────────────────────────────────────────
@@ -65,16 +80,17 @@ export function buildPrompt(
   aiBehavior: string = "supportive"
 ): string {
   const parts: string[] = [];
+  const messageCount = allMessages.length;
 
   // ── Layer 1: System Prompt & Mood Awareness ──
-  let systemPrompt = getBaseSystemPrompt(aiName, aiBehavior);
+  let systemPrompt = getBaseSystemPrompt(aiName, aiBehavior, messageCount);
   if (userName) {
     systemPrompt += `\n\nThe user's name is ${userName}.`;
   }
-  
+
   if (latestMood && latestMood !== "unknown") {
     systemPrompt += `\n\nThe user's last tracked mood was ${latestMood}.`;
-    if (allMessages.length <= 1) { // 0 or 1 messages means start of chat
+    if (allMessages.length <= 1) {
       systemPrompt += `\nSince this is the beginning of the conversation, warmly and gently acknowledge this mood and ask how they are feeling today. If they were feeling low, make sure to console them first.`;
     }
   }
@@ -123,6 +139,6 @@ export function buildPrompt(
 /**
  * Returns the system prompt constant for external use (e.g. logging).
  */
-export function getSystemPrompt(aiName: string = "Maya", aiBehavior: string = "supportive"): string {
-  return getBaseSystemPrompt(aiName, aiBehavior);
+export function getSystemPrompt(aiName: string = "Maya", aiBehavior: string = "supportive", messageCount: number = 0): string {
+  return getBaseSystemPrompt(aiName, aiBehavior, messageCount);
 }

@@ -7,10 +7,6 @@ import { uploadImage } from "../services/cloudinary.service";
  * Update user profile details (name, email, profileImage)
  */
 export const updateProfile: RequestHandler = async (req, res) => {
-  console.log("---- REQUEST DEBUG (updateProfile) ----");
-  console.log("BODY:", req.body);
-  console.log("USER:", req.user);
-
   if (!req.user) {
     console.error("USER UNDEFINED - AUTH FAILED");
     return res.status(401).json({ error: "Unauthorized" });
@@ -56,9 +52,6 @@ export const updateProfile: RequestHandler = async (req, res) => {
  * Get current user profile
  */
 export const getProfile: RequestHandler = async (req, res) => {
-  console.log("---- REQUEST DEBUG (getProfile) ----");
-  console.log("USER:", req.user);
-
   if (!req.user) {
     console.error("USER UNDEFINED - AUTH FAILED");
     return res.status(401).json({ error: "Unauthorized" });
@@ -87,10 +80,6 @@ export const getProfile: RequestHandler = async (req, res) => {
  * Upload profile avatar to Cloudinary
  */
 export const uploadAvatar: RequestHandler = async (req, res) => {
-  console.log("---- REQUEST DEBUG (uploadAvatar) ----");
-  console.log("FILE:", req.file);
-  console.log("USER:", req.user);
-
   if (!req.user) {
     console.error("USER UNDEFINED - AUTH FAILED");
     return res.status(401).json({ error: "Unauthorized" });
@@ -121,10 +110,6 @@ export const uploadAvatar: RequestHandler = async (req, res) => {
  * Upload AI avatar to Cloudinary
  */
 export const uploadAiAvatar: RequestHandler = async (req, res) => {
-  console.log("---- REQUEST DEBUG (uploadAiAvatar) ----");
-  console.log("FILE:", req.file);
-  console.log("USER:", req.user);
-
   if (!req.user) {
     console.error("USER UNDEFINED - AUTH FAILED");
     return res.status(401).json({ error: "Unauthorized" });

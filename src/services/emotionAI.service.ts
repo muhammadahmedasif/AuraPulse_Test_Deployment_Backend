@@ -44,7 +44,7 @@ function fallbackAnalysis(message: string, latestMood: string): EmotionAIResult 
     return { emotion: "stress", intensity: 0.75, suggestedActivity: "zen", autoTrigger: false };
   }
   if (lowercaseMsg.includes("sad") || lowercaseMsg.includes("depress")) {
-    return { emotion: "low", intensity: 0.7, suggestedActivity: "forest", autoTrigger: latestMood === "low" };
+    return { emotion: "low", intensity: 0.7, suggestedActivity: "forest", autoTrigger: false };
   }
 
   return { emotion: "neutral", intensity: 0.1, suggestedActivity: null, autoTrigger: false };
@@ -59,7 +59,8 @@ export async function analyzeUserState(params: EmotionAIParams): Promise<Emotion
   }
 
   const systemPrompt = `You are an emotion analysis engine.
-Analyze emotional state based on context.
+Analyze emotional state ONLY based on the current user message.
+Ignore conversation history - focus ONLY on what the user said NOW.
 Return ONLY valid JSON with this exact structure:
 {"emotion":"panic|stress|low|neutral|positive","intensity":0.0-1.0,"suggestedActivity":"breathing|ocean|forest|zen|null","autoTrigger":true|false}
 
@@ -72,12 +73,15 @@ neutral/positive -> null
 AUTO TRIGGER RULES:
 autoTrigger = true IF:
 - intensity > 0.7
-- OR latestMood = low / very_low`;
+- AND the current message clearly expresses emotional distress
 
-  const userPrompt = `User message: "${params.userMessage}"
-Recent context: "${params.recentMessages}"
-Summary: "${params.sessionSummary}"
-Mood: "${params.latestMood}"`;
+NOTE: DO NOT suggest activities based on conversation history or patterns.
+Only suggest if current message shows clear emotional need.`;
+
+  const userPrompt = `Current user message: "${params.userMessage}"
+
+Analyze ONLY this current message. Ignore any context or history.
+Determine emotional state from THIS message alone.`;
 
   const keys = [groq1, groq2];
   let lastError: any = null;

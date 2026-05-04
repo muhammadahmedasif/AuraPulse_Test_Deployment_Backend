@@ -9,11 +9,6 @@ export const createMood = async (
   res: Response,
   next: NextFunction
 ) => {
-  console.log("---- REQUEST DEBUG (createMood) ----");
-  console.log("BODY:", req.body);
-  console.log("USER:", req.user);
-  console.log("PARAMS:", req.params);
-
   if (!req.user) {
     console.error("USER UNDEFINED - AUTH FAILED");
     return res.status(401).json({ error: "Unauthorized" });
@@ -23,7 +18,6 @@ export const createMood = async (
     const { score, note } = req.body;
     const userId = req.user._id;
 
-    console.log("Saving mood for user:", userId);
 
     const mood = new Mood({
       userId,
@@ -55,10 +49,6 @@ export const getMoodHistory = async (
   res: Response,
   next: NextFunction
 ) => {
-  console.log("---- REQUEST DEBUG (getMoodHistory) ----");
-  console.log("QUERY:", req.query);
-  console.log("USER:", req.user);
-
   if (!req.user) {
     console.error("USER UNDEFINED - AUTH FAILED");
     return res.status(401).json({ error: "Unauthorized" });
@@ -109,10 +99,6 @@ export const getMoodStats = async (
   res: Response,
   next: NextFunction
 ) => {
-  console.log("---- REQUEST DEBUG (getMoodStats) ----");
-  console.log("QUERY:", req.query);
-  console.log("USER:", req.user);
-
   if (!req.user) {
     console.error("USER UNDEFINED - AUTH FAILED");
     return res.status(401).json({ error: "Unauthorized" });
