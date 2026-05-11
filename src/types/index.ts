@@ -20,17 +20,28 @@ export interface MessageAnalysis {
   progressIndicators: string[];
 }
 
+export interface EmotionMeta {
+  emotion: "panic" | "stress" | "low" | "neutral" | "positive";
+  intensity: number;
+  suggestedActivity: "breathing" | "ocean" | "forest" | "zen" | null;
+  autoTrigger: boolean;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
   metadata?: {
     analysis?: MessageAnalysis;
+    technique?: string;
+    goal?: string;
     currentGoal?: string | null;
     progress?: {
       emotionalState?: string;
       riskLevel?: number;
     };
+    emotionMeta?: EmotionMeta | null;
+    source?: "text" | "voice";
   };
 }
 

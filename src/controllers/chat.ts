@@ -63,7 +63,8 @@ export const createChatSession = async (req: Request, res: Response) => {
 export const sendMessage = async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
-    const { message } = req.body;
+    const { message, source } = req.body;
+    const messageSource = source === "voice" ? "voice" : "text";
     const userId = req.user._id;
     const userName = req.user.name;
 
@@ -77,7 +78,7 @@ export const sendMessage = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Message is required" });
     }
 
-    logger.info("Processing chat message", { sessionId });
+    logger.info("Processing chat message", { sessionId, source: messageSource });
 
     // ── Load session & mood ──
     const session = await ChatSession.findOne({ sessionId });
@@ -173,6 +174,10 @@ export const sendMessage = async (req: Request, res: Response) => {
                 role: "user",
                 content: message,
                 timestamp: new Date(),
+                metadata: {
+                  emotionMeta,
+                  source: messageSource,
+                },
               },
               {
                 role: "assistant",
@@ -180,11 +185,14 @@ export const sendMessage = async (req: Request, res: Response) => {
                 timestamp: new Date(),
                 metadata: {
                   analysis: defaultAnalysis,
+                  technique: defaultAnalysis.recommendedApproach,
+                  goal: "Provide support",
                   progress: {
                     emotionalState: defaultAnalysis.emotionalState,
                     riskLevel: defaultAnalysis.riskLevel,
                   },
                   emotionMeta,
+                  source: messageSource,
                 },
               },
             ],

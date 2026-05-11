@@ -1,5 +1,5 @@
 import { Document, Schema, model, Types } from "mongoose";
-import { MessageAnalysis } from "../types";
+import { EmotionMeta, MessageAnalysis } from "../types";
 
 export interface IChatMessage {
   role: "user" | "assistant";
@@ -7,11 +7,15 @@ export interface IChatMessage {
   timestamp: Date;
   metadata?: {
     analysis?: MessageAnalysis;
+    technique?: string;
+    goal?: string;
     currentGoal?: string | null;
     progress?: {
       emotionalState?: string;
       riskLevel?: number;
     };
+    emotionMeta?: EmotionMeta | null;
+    source?: "text" | "voice";
   };
 }
 
@@ -32,10 +36,21 @@ const chatMessageSchema = new Schema<IChatMessage>({
   timestamp: { type: Date, required: true },
   metadata: {
     analysis: Schema.Types.Mixed,
+    technique: String,
+    goal: String,
     currentGoal: String,
     progress: {
       emotionalState: String,
       riskLevel: Number,
+    },
+    emotionMeta: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
+    source: {
+      type: String,
+      enum: ["text", "voice"],
+      default: "text",
     },
   },
 });
