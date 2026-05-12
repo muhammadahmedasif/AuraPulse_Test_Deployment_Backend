@@ -25,6 +25,14 @@ export interface EmotionMeta {
   intensity: number;
   suggestedActivity: "breathing" | "ocean" | "forest" | "zen" | null;
   autoTrigger: boolean;
+  // ── Crisis Extension (Phase 1) ─────────────────────────────
+  crisisRiskScore?: number;       // 0.0–1.0 composite risk
+  suicideRisk?: number;           // 0.0–1.0
+  selfHarmRisk?: number;          // 0.0–1.0
+  panicSeverity?: number;         // 0.0–1.0
+  escalationRecommended?: boolean;
+  escalationReason?: string;
+  recommendedAction?: string;
 }
 
 export interface ChatMessage {

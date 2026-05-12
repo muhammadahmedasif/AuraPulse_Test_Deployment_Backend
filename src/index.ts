@@ -9,12 +9,14 @@ import helmet from "helmet";
 import morgan from "morgan";
 import { errorHandler } from "./middleware/errorHandler";
 import { logger } from "./utils/logger";
-import authRouter from "./routes/auth";
-import chatRouter from "./routes/chat";
-import moodRouter from "./routes/mood";
+import authRouter     from "./routes/auth";
+import chatRouter     from "./routes/chat";
+import moodRouter     from "./routes/mood";
 import activityRouter from "./routes/activity";
-import userRouter from "./routes/user";
-import { connectDB } from "./utils/db";
+import userRouter     from "./routes/user";
+import emergencyRouter from "./routes/emergency";
+import twilioRouter   from "./routes/twilio";
+import { connectDB }  from "./utils/db";
 
 // Create Express app
 const app: any = express();
@@ -31,11 +33,13 @@ app.get("/health", (req: Request, res: Response) => {
 });
 
 // API Routes
-app.use("/api/auth", authRouter);
-app.use("/api/chat", chatRouter);
-app.use("/api/mood", moodRouter);
-app.use("/api/activity", activityRouter);
-app.use("/api/user", userRouter);
+app.use("/api/auth",      authRouter);
+app.use("/api/chat",      chatRouter);
+app.use("/api/mood",      moodRouter);
+app.use("/api/activity",  activityRouter);
+app.use("/api/user",      userRouter);
+app.use("/api/emergency", emergencyRouter);
+app.use("/api/twilio",    twilioRouter);
 
 // Backward compatibility
 app.use("/auth", authRouter);

@@ -13,6 +13,8 @@ import {
 import { MessageAnalysis } from "../types";
 import { Mood } from "../models/Mood";
 import { analyzeUserState } from "../services/emotionAI.service";
+import * as escalationEngine from "../services/crisis/escalation-engine.service";
+
 
 // ── Default Analysis (until real analysis is implemented) ──────
 const defaultAnalysis: MessageAnalysis = {
@@ -162,6 +164,18 @@ export const sendMessage = async (req: Request, res: Response) => {
     // ── Await Emotion Analysis ──
     // This is safe because it's fast and we are already done streaming text.
     const emotionMeta = await emotionPromise;
+
+    // ── Crisis Escalation (async fire-and-forget — NEVER blocks chat) ──────
+    if (emotionMeta) {
+      void escalationEngine.evaluate(
+        userId.toString(),
+        sessionId,
+        userName || "User",
+        emotionMeta,
+        message
+      );
+    }
+
 
     // ── Save messages atomically ──
     const updatedSession = await ChatSession.findOneAndUpdate(

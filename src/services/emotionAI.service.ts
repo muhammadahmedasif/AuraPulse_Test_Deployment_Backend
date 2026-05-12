@@ -16,6 +16,13 @@ export interface EmotionAIResult {
   intensity: number;
   suggestedActivity: "breathing" | "ocean" | "forest" | "zen" | null;
   autoTrigger: boolean;
+  // ── Crisis fields (Phase 1 extension) ──────────────────────
+  crisisRiskScore?: number;
+  suicideRisk?: number;
+  selfHarmRisk?: number;
+  panicSeverity?: number;
+  escalationRecommended?: boolean;
+  escalationReason?: string;
 }
 
 // ── Smart Gate ────────────────────────────────────────────────
@@ -27,24 +34,74 @@ function isGreeting(message: string): boolean {
   return greetings.includes(clean);
 }
 
-// ── Fallback Heuristic ─────────────────────────────────────────
+// ── Robust JSON Parser ────────────────────────────────────────
+function safeJsonParse(text: string): any {
+  try {
+    // 1. Try direct parse
+    return JSON.parse(text);
+  } catch (e) {
+    try {
+      // 2. Try to extract JSON from markdown or extra text
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+    } catch (e2) {
+      logger.warn("🧠 emotionAI: Failed to parse JSON even after extraction", { text });
+    }
+    return null;
+  }
+}
+
+// ── Fallback Heuristic (Task 3: Hybrid System) ────────────────
 function fallbackAnalysis(message: string, latestMood: string): EmotionAIResult {
   const lowercaseMsg = message.toLowerCase();
+
+  // ── CRITICAL Keywords (RiskLevel: CRITICAL) ──────────────────
+  const criticalKeywords = [
+    "kill myself", "end my life", "suicide", "will end my life", 
+    "want to kill myself", "better off dead", "don't want to live anymore",
+    "cannot live anymore", "taking my life", "hanging myself", "swallow pills"
+  ];
   
-  if (lowercaseMsg.includes("panic")) {
-    return { emotion: "panic", intensity: 0.9, suggestedActivity: "breathing", autoTrigger: true };
+  // ── HIGH Keywords (RiskLevel: HIGH) ──────────────────────────
+  const highKeywords = [
+    "want to die", "no reason to live", "done living", "wish i was dead",
+    "end it all", "i'm done", "life is over", "hurt myself", "cutting"
+  ];
+
+  // ── MEDIUM Keywords (RiskLevel: MEDIUM) ──────────────────────
+  const mediumKeywords = [
+    "hopeless", "trapped", "no future", "panic", "anxiety", "scared",
+    "help me", "can't cope", "overwhelmed"
+  ];
+
+  const hasCritical = criticalKeywords.some(kw => lowercaseMsg.includes(kw));
+  const hasHigh = highKeywords.some(kw => lowercaseMsg.includes(kw));
+  const hasMedium = mediumKeywords.some(kw => lowercaseMsg.includes(kw));
+
+  if (hasCritical) {
+    return {
+      emotion: "low", intensity: 1.0, suggestedActivity: null, autoTrigger: true,
+      crisisRiskScore: 0.95, suicideRisk: 0.95, selfHarmRisk: 0.5, panicSeverity: 0.5,
+      escalationRecommended: true, escalationReason: "Critical suicide keywords detected"
+    };
   }
-  if (lowercaseMsg.includes("stress")) {
-    return { emotion: "stress", intensity: 0.8, suggestedActivity: "ocean", autoTrigger: true };
+
+  if (hasHigh) {
+    return {
+      emotion: "low", intensity: 0.9, suggestedActivity: null, autoTrigger: true,
+      crisisRiskScore: 0.85, suicideRisk: 0.8, selfHarmRisk: 0.7, panicSeverity: 0.4,
+      escalationRecommended: true, escalationReason: "High risk emotional distress keywords"
+    };
   }
-  if (lowercaseMsg.includes("anxious") || lowercaseMsg.includes("anxiety")) {
-    return { emotion: "stress", intensity: 0.7, suggestedActivity: "breathing", autoTrigger: false };
-  }
-  if (lowercaseMsg.includes("overwhelm")) {
-    return { emotion: "stress", intensity: 0.75, suggestedActivity: "zen", autoTrigger: false };
-  }
-  if (lowercaseMsg.includes("sad") || lowercaseMsg.includes("depress")) {
-    return { emotion: "low", intensity: 0.7, suggestedActivity: "forest", autoTrigger: false };
+
+  if (hasMedium) {
+    return {
+      emotion: "stress", intensity: 0.75, suggestedActivity: "breathing", autoTrigger: false,
+      crisisRiskScore: 0.5, suicideRisk: 0.2, selfHarmRisk: 0.2, panicSeverity: 0.6,
+      escalationRecommended: false, escalationReason: "Medium distress detected"
+    };
   }
 
   return { emotion: "neutral", intensity: 0.1, suggestedActivity: null, autoTrigger: false };
@@ -54,71 +111,66 @@ function fallbackAnalysis(message: string, latestMood: string): EmotionAIResult 
 export async function analyzeUserState(params: EmotionAIParams): Promise<EmotionAIResult> {
   // ── Smart Gate ──
   if (params.userMessage.length < 5 || isGreeting(params.userMessage)) {
-    logger.info("🧠 emotionAI: Smart Gate triggered, using heuristic");
     return fallbackAnalysis(params.userMessage, params.latestMood);
   }
 
-  const systemPrompt = `You are an emotion analysis engine.
-Analyze emotional state ONLY based on the current user message.
-Ignore conversation history - focus ONLY on what the user said NOW.
-Return ONLY valid JSON with this exact structure:
-{"emotion":"panic|stress|low|neutral|positive","intensity":0.0-1.0,"suggestedActivity":"breathing|ocean|forest|zen|null","autoTrigger":true|false}
+  const systemPrompt = `You are a deterministic crisis classifier. Output ONLY valid JSON.
+No markdown. No extra text. No explanations.
+SCHEMA:
+{
+  "emotion": "panic"|"stress"|"low"|"neutral"|"positive",
+  "intensity": 0.0-1.0,
+  "suggestedActivity": "breathing"|"ocean"|"forest"|"zen"|null,
+  "autoTrigger": boolean,
+  "crisisRiskScore": 0.0-1.0,
+  "suicideRisk": 0.0-1.0,
+  "selfHarmRisk": 0.0-1.0,
+  "panicSeverity": 0.0-1.0,
+  "riskLevel": "LOW"|"MEDIUM"|"HIGH"|"CRITICAL",
+  "escalationRecommended": boolean,
+  "escalationReason": "string"
+}`;
 
-DECISION RULES:
-panic -> breathing
-stress -> ocean OR breathing
-low -> forest OR zen
-neutral/positive -> null
-
-AUTO TRIGGER RULES:
-autoTrigger = true IF:
-- intensity > 0.7
-- AND the current message clearly expresses emotional distress
-
-NOTE: DO NOT suggest activities based on conversation history or patterns.
-Only suggest if current message shows clear emotional need.`;
-
-  const userPrompt = `Current user message: "${params.userMessage}"
-
-Analyze ONLY this current message. Ignore any context or history.
-Determine emotional state from THIS message alone.`;
+  const userPrompt = `User Message: "${params.userMessage}"`;
 
   const keys = [groq1, groq2];
-  let lastError: any = null;
-
+  
   for (let i = 0; i < keys.length; i++) {
     const groq = keys[i];
     try {
-      logger.info(`🧠 emotionAI: Running Groq analysis (Key ${i + 1})...`);
-      
       const completion = await groq.chat.completions.create({
         model: MODEL_NAME,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
         ],
-        max_tokens: 80,
-        temperature: 0.1,
+        max_tokens: 150,
+        temperature: 0,
         response_format: { type: "json_object" }
-      }, {
-        timeout: 1500 // VERY strict 1.5s timeout
-      });
+      }, { timeout: 2000 });
 
       const text = completion.choices[0]?.message?.content || "{}";
-      const data = JSON.parse(text);
+      const data = safeJsonParse(text);
+
+      if (!data) throw new Error("Invalid JSON from Groq");
 
       const finalResult: EmotionAIResult = {
         emotion: data.emotion || "neutral",
         intensity: data.intensity || 0.1,
         suggestedActivity: (data.suggestedActivity === "null" || !data.suggestedActivity) ? null : data.suggestedActivity,
-        autoTrigger: data.autoTrigger || false
+        autoTrigger: data.autoTrigger || false,
+        crisisRiskScore: Number(data.crisisRiskScore) || 0,
+        suicideRisk: Number(data.suicideRisk) || 0,
+        selfHarmRisk: Number(data.selfHarmRisk) || 0,
+        panicSeverity: Number(data.panicSeverity) || 0,
+        escalationRecommended: !!data.escalationRecommended || (data.riskLevel === "HIGH" || data.riskLevel === "CRITICAL"),
+        escalationReason: data.escalationReason || "Assessment",
       };
 
-      logger.info(`✅ emotionAI: Groq Key ${i + 1} Complete`, finalResult);
+      logger.info("🧠 emotionAI: Analysis Complete", { risk: data.riskLevel, score: finalResult.crisisRiskScore });
       return finalResult;
       
     } catch (error) {
-      lastError = error;
       logger.warn(`⚠️ emotionAI: Groq Key ${i + 1} failed, ${i === 0 ? 'switching...' : 'falling back to heuristic'}`, { 
         error: error instanceof Error ? error.message : String(error) 
       });
