@@ -29,107 +29,174 @@ function sendTwiML(res: Response, twiml: string): void {
 
 // ── POST /api/twilio/voice — Initial webhook (call connected) ──────────────────
 export const handleVoiceWebhook = async (req: Request, res: Response): Promise<void> => {
+  const timestamp = new Date().toISOString();
+  const sessionId = (req.query.sessionId as string) || "unknown";
+  
+  logger.info("[TWILIO_WEBHOOK_HIT]", { 
+    path: "/api/twilio/voice",
+    sessionId, 
+    timestamp,
+    method: req.method,
+    query: req.query,
+    body: req.body 
+  });
+
   try {
-    const callSid      = req.body?.CallSid || req.query.callSid as string;
-    const userId       = req.query.userId       as string || "";
-    const sessionId    = req.query.sessionId    as string || "";
-    const contactName  = req.query.contactName  as string || "there";
-    const relationship = req.query.relationship as string || "family member";
+    const callSid      = req.body?.CallSid || (req.query.callSid as string);
+    const userId       = (req.query.userId as string) || "";
+    const contactName  = (req.query.contactName as string) || "there";
+    const userName     = (req.query.userName as string) || "someone";
+    const riskLevel    = (req.query.riskLevel as string) || "HIGH";
 
-    logger.info("[TWILIO] Call connected", { callSid, userId, contactName });
-    EscalationLogger.callConnected({ userId, sessionId, callSid, contactCalled: contactName });
+    // 1. Respond IMMEDIATELY with Bridge TwiML to stabilize call
+    const baseUrl = process.env.TWILIO_WEBHOOK_BASE_URL || process.env.BASE_URL;
+    const introUrl = `${baseUrl}/api/twilio/voice/intro?callSid=${encodeURIComponent(callSid)}&userId=${encodeURIComponent(userId)}&sessionId=${encodeURIComponent(sessionId)}&contactName=${encodeURIComponent(contactName)}&userName=${encodeURIComponent(userName)}&riskLevel=${encodeURIComponent(riskLevel)}`;
 
-    // Retrieve or rebuild crisis context
+    const bridgeTwiML = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Pause length="1"/>
+  <Say voice="alice">This is an emergency call from AuraPulse. Please stay on the line.</Say>
+  <Redirect method="POST">${introUrl.replace(/&/g, "&amp;")}</Redirect>
+</Response>`;
+
+    res.type("text/xml");
+    res.send(bridgeTwiML);
+    
+    logger.info("[TWILIO_TWIML_SENT]", { 
+      sessionId, 
+      type: "bridge",
+      twiml: bridgeTwiML 
+    });
+
+    // 2. Background work: Ensure session is initialized
     let callSession = twilioSessionManager.get(callSid);
-
-    if (!callSession && userId && sessionId) {
-      // Rebuild minimal context if session was lost (e.g. server restart)
-      const emotionalSummary = await buildEmergencyCallContext(sessionId, userId);
+    if (!callSession && userId) {
       const assessment: CrisisAssessment = {
-        riskLevel: "HIGH", crisisRiskScore: 0.8,
+        riskLevel: (riskLevel as any) || "HIGH",
+        crisisRiskScore: 0.8,
         suicideRisk: 0, selfHarmRisk: 0, panicSeverity: 0,
         escalationRecommended: true, confidence: 0.7,
         escalationReason: "severe emotional distress",
         recommendedAction: "Please check on this person immediately",
       };
-      const crisisContext: CrisisContext = {
-        userId, sessionId, userName: "the individual",
-        assessment, emotionalSummary,
-        triggeringStatements: [],
-        recommendedAction: "Please reach out immediately",
-      };
-      callSession = {
+
+      twilioSessionManager.set(callSid, {
         callSid, userId, sessionId,
         contactName, contactPhone: "",
-        crisisContext,
+        crisisContext: {
+          userId, sessionId, userName,
+          assessment,
+          emotionalSummary: "Initial handshake in progress...",
+          triggeringStatements: [],
+          recommendedAction: assessment.recommendedAction!,
+        },
         conversationHistory: [],
         startedAt: new Date(),
-      };
-      twilioSessionManager.set(callSid, callSession);
+      });
     }
 
+  } catch (err) {
+    logger.error("[WEBHOOK_EXCEPTION]", { error: String(err), sessionId });
+    res.type("text/xml");
+    res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say>Emergency system activated. Please hold.</Say></Response>`);
+  }
+};
+
+// ── POST /api/twilio/voice/intro — Secondary webhook (play real greeting) ────────
+export const handleVoiceIntro = async (req: Request, res: Response): Promise<void> => {
+  const sessionId = (req.query.sessionId as string) || "unknown";
+  logger.info("[TWILIO_WEBHOOK_HIT]", { path: "/api/twilio/voice/intro", sessionId });
+
+  try {
+    const callSid     = (req.query.callSid || req.body?.CallSid) as string;
+    const contactName = (req.query.contactName as string) || "there";
+    const userName    = (req.query.userName as string) || "someone";
+
+    const callSession = twilioSessionManager.get(callSid);
+    
     if (!callSession) {
-      logger.warn("[TWILIO] Session not found and context unavailable", { callSid });
-      sendTwiML(res, buildClosingTwiML(
-        "Hello, this is AuraPulse Emergency Support. We were calling regarding a wellness concern. Please contact AuraPulse for more information. Goodbye."
-      ));
+      const twiml = buildClosingTwiML("Hello, we are calling regarding a wellness concern for " + userName + ". Please reach out to them. Goodbye.");
+      res.type("text/xml");
+      res.send(twiml);
       return;
     }
 
-    const opening = buildOpeningMessage(
-      contactName,
-      callSession.crisisContext.userName,
-      callSession.crisisContext
-    );
-
-    // Store opening in history
+    const opening = buildOpeningMessage(contactName, userName, callSession.crisisContext);
+    
     twilioSessionManager.update(callSid, {
       conversationHistory: [{ role: "ai", content: opening }],
     });
 
-    sendTwiML(res, buildGreetingTwiML(contactName, callSession.crisisContext.userName, opening, callSid));
+    const twiml = buildGreetingTwiML(contactName, userName, opening, callSid);
+    res.type("text/xml");
+    res.send(twiml);
+    
+    logger.info("[TWILIO_CALL_ACTIVE]", { sessionId, twiml });
+
+    // Optional: Kick off background context building
+    if (callSession.crisisContext.emotionalSummary.includes("handshake")) {
+       void buildEmergencyCallContext(callSession.sessionId, callSession.userId).then(summary => {
+         twilioSessionManager.update(callSid, {
+           crisisContext: { ...callSession.crisisContext, emotionalSummary: summary }
+         });
+       });
+    }
 
   } catch (err) {
-    logger.error("[TWILIO] handleVoiceWebhook error", { error: String(err) });
-    sendTwiML(res, buildErrorTwiML());
+    logger.error("[WEBHOOK_EXCEPTION]", { error: String(err), path: "/intro" });
+    res.type("text/xml");
+    res.send(buildErrorTwiML());
   }
+};
+
+// ── GET /api/twilio/debug — Dedicated Twilio debug route ───────────────────────
+export const handleDebug = async (req: Request, res: Response): Promise<void> => {
+  logger.info("[TWILIO_DEBUG_HIT]", { query: req.query });
+  const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">AuraPulse Twilio Debug Route is working correctly. This is a test message to verify XML parsing and connectivity. One. Two. Three. Success.</Say>
+  <Pause length="2"/>
+  <Say voice="alice">If you can hear this, your webhook configuration is valid. Goodbye.</Say>
+  <Hangup/>
+</Response>`;
+  res.type("text/xml");
+  res.send(twiml);
 };
 
 // ── POST /api/twilio/voice/respond — Contact spoke, generate AI reply ──────────
 export const handleVoiceRespond = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const callSid      = (req.query.callSid || req.body?.CallSid) as string;
-    const speechResult = (req.body?.SpeechResult || "").trim();
+  const callSid = (req.query.callSid || req.body?.CallSid) as string;
+  logger.info("[TWILIO_WEBHOOK_HIT]", { path: "/api/twilio/voice/respond", callSid });
 
-    logger.info("[TWILIO] Contact spoke", { callSid, speech: speechResult.slice(0, 80) });
+  try {
+    const speechResult = (req.body?.SpeechResult || "").trim();
+    logger.info("[TWILIO_CONTACT_SPOKE]", { callSid, speech: speechResult.slice(0, 80) });
 
     const callSession = twilioSessionManager.get(callSid);
 
     if (!callSession) {
-      logger.warn("[TWILIO] No session for callSid", { callSid });
-      sendTwiML(res, buildClosingTwiML(
-        "Thank you for your time. Please reach out to the individual directly. Goodbye."
-      ));
+      const twiml = buildClosingTwiML("Thank you for your time. Please reach out to the individual directly. Goodbye.");
+      res.type("text/xml");
+      res.send(twiml);
       return;
     }
 
     if (!speechResult) {
-      // No speech detected — re-prompt
-      sendTwiML(res, buildResponseTwiML(
+      const twiml = buildResponseTwiML(
         "I'm sorry, I didn't catch that. Could you please repeat your question?",
         callSid,
         callSession.conversationHistory.length
-      ));
+      );
+      res.type("text/xml");
+      res.send(twiml);
       return;
     }
 
-    // Add contact speech to history
     const updatedHistory = [
       ...callSession.conversationHistory,
       { role: "contact" as const, content: speechResult },
     ];
 
-    // Build prompt and call Groq (reuses existing generate())
     const prompt = buildCallResponsePrompt(
       callSession.crisisContext,
       speechResult,
@@ -137,10 +204,8 @@ export const handleVoiceRespond = async (req: Request, res: Response): Promise<v
     );
 
     const aiResponse = await generate(prompt, { maxTokens: 120, temperature: 0.6 });
-    const cleanResponse = aiResponse.trim() ||
-      "I understand your concern. Please reach out to the individual as soon as possible and offer your support.";
+    const cleanResponse = aiResponse.trim() || "I understand. Please reach out to them immediately.";
 
-    // Update history with AI response
     twilioSessionManager.update(callSid, {
       conversationHistory: [
         ...updatedHistory,
@@ -148,49 +213,42 @@ export const handleVoiceRespond = async (req: Request, res: Response): Promise<v
       ],
     });
 
-    const turnCount = updatedHistory.length;
-    sendTwiML(res, buildResponseTwiML(cleanResponse, callSid, turnCount));
+    const twiml = buildResponseTwiML(cleanResponse, callSid, updatedHistory.length);
+    res.type("text/xml");
+    res.send(twiml);
+    
+    logger.info("[TWILIO_TWIML_SENT]", { callSid, type: "response", twiml });
 
   } catch (err) {
-    logger.error("[TWILIO] handleVoiceRespond error", { error: String(err) });
-    sendTwiML(res, buildErrorTwiML());
+    logger.error("[WEBHOOK_EXCEPTION]", { error: String(err), path: "/respond" });
+    res.type("text/xml");
+    res.send(buildErrorTwiML());
   }
 };
 
 // ── POST /api/twilio/voice/status — Call status webhook ───────────────────────
 export const handleCallStatus = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { CallSid, CallStatus } = req.body;
-
-    logger.info("[TWILIO] Call status update", { callSid: CallSid, status: CallStatus });
+    const { CallSid, CallStatus, CallDuration } = req.body;
+    logger.info("[TWILIO_STATUS_CALLBACK]", { callSid: CallSid, status: CallStatus, duration: CallDuration });
 
     const callSession = twilioSessionManager.get(CallSid);
     const userId = callSession?.userId;
 
     if (CallStatus === "completed") {
       EscalationLogger.callCompleted({ userId: userId || "unknown", callSid: CallSid });
-      await EscalationLog.findOneAndUpdate(
-        { callSid: CallSid },
-        { outcome: "completed" }
-      );
+      await EscalationLog.findOneAndUpdate({ callSid: CallSid }, { outcome: "completed", duration: CallDuration });
       twilioSessionManager.delete(CallSid);
-
     } else if (["failed", "busy", "no-answer", "canceled"].includes(CallStatus)) {
-      EscalationLogger.callFailed({
-        userId: userId || "unknown",
-        callSid: CallSid,
-        error: `Call ended with status: ${CallStatus}`,
-      });
-      await EscalationLog.findOneAndUpdate(
-        { callSid: CallSid },
-        { outcome: "failed", error: CallStatus }
-      );
+      EscalationLogger.callFailed({ userId: userId || "unknown", callSid: CallSid, error: CallStatus });
+      await EscalationLog.findOneAndUpdate({ callSid: CallSid }, { outcome: "failed", error: CallStatus });
       twilioSessionManager.delete(CallSid);
     }
 
     res.sendStatus(204);
   } catch (err) {
-    logger.error("[TWILIO] handleCallStatus error", { error: String(err) });
-    res.sendStatus(204); // Always 204 to Twilio to prevent retries
+    logger.error("[WEBHOOK_EXCEPTION]", { error: String(err), path: "/status" });
+    res.sendStatus(204);
   }
 };
+

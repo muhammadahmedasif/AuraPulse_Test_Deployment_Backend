@@ -33,22 +33,7 @@ export function buildGreetingTwiML(
 
   logger.info("[TWIML] Building greeting", { callSid, contactName });
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice" language="en-US">${safeMessage}</Say>
-  <Gather
-    input="speech"
-    action="${BASE_URL}/api/twilio/voice/respond?callSid=${encodeURIComponent(callSid)}"
-    method="POST"
-    timeout="8"
-    speechTimeout="3"
-    language="en-US"
-  >
-    <Say voice="alice" language="en-US">Please feel free to ask me anything, ${safeContact}.</Say>
-  </Gather>
-  <Say voice="alice" language="en-US">I didn't catch that. I'll try again shortly. Please call us back if you need more information.</Say>
-  <Hangup/>
-</Response>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice" language="en-US">${safeMessage}</Say><Gather input="speech" action="${BASE_URL}/api/twilio/voice/respond?callSid=${encodeURIComponent(callSid)}" method="POST" timeout="8" speechTimeout="3" language="en-US"><Say voice="alice" language="en-US">Please feel free to ask me anything, ${safeContact}.</Say></Gather><Say voice="alice" language="en-US">I didn't catch that. I'll try again shortly. Please call us back if you need more information.</Say><Hangup/></Response>`;
 }
 
 // ── AI response TwiML ──────────────────────────────────────────────────────────
@@ -67,42 +52,16 @@ export function buildResponseTwiML(
     );
   }
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice" language="en-US">${safeResponse}</Say>
-  <Gather
-    input="speech"
-    action="${BASE_URL}/api/twilio/voice/respond?callSid=${encodeURIComponent(callSid)}"
-    method="POST"
-    timeout="8"
-    speechTimeout="3"
-    language="en-US"
-  >
-    <Say voice="alice" language="en-US">Is there anything else I can help you with?</Say>
-  </Gather>
-  <Say voice="alice" language="en-US">Thank you for your concern. Please reach out to the individual directly. Goodbye.</Say>
-  <Hangup/>
-</Response>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice" language="en-US">${safeResponse}</Say><Gather input="speech" action="${BASE_URL}/api/twilio/voice/respond?callSid=${encodeURIComponent(callSid)}" method="POST" timeout="8" speechTimeout="3" language="en-US"><Say voice="alice" language="en-US">Is there anything else I can help you with?</Say></Gather><Say voice="alice" language="en-US">Thank you for your concern. Please reach out to the individual directly. Goodbye.</Say><Hangup/></Response>`;
 }
 
 // ── Closing TwiML ──────────────────────────────────────────────────────────────
 export function buildClosingTwiML(message: string): string {
   const safeMessage = xmlEscape(message);
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice" language="en-US">${safeMessage}</Say>
-  <Hangup/>
-</Response>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice" language="en-US">${safeMessage}</Say><Hangup/></Response>`;
 }
 
 // ── Error fallback TwiML ───────────────────────────────────────────────────────
 export function buildErrorTwiML(): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice" language="en-US">
-    We apologize, there was a technical issue processing your response.
-    Please contact the individual directly. Thank you and goodbye.
-  </Say>
-  <Hangup/>
-</Response>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice" language="en-US">We apologize, there was a technical issue processing your response. Please contact the individual directly. Thank you and goodbye.</Say><Hangup/></Response>`;
 }

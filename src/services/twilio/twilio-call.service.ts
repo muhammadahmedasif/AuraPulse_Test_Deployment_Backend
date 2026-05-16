@@ -69,12 +69,25 @@ export async function initiateEmergencyCall(
     relationship: contact.relationship,
   });
 
+  const webhookUrl = `${baseUrl}/api/twilio/voice?${webhookParams.toString()}`;
+  const statusUrl  = `${baseUrl}/api/twilio/voice/status`;
+
+  if (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")) {
+    logger.warn("[TWILIO_LOCAL_URL_WARNING] Webhook URL contains localhost. Twilio will not be able to reach this unless you are using ngrok and have configured BASE_URL correctly.", { baseUrl });
+  }
+
+  logger.info("[TWILIO_CALL_ATTEMPT]", {
+    to: contact.phone,
+    webhookUrl,
+    statusCallback: statusUrl
+  });
+
   try {
     const call = await client.calls.create({
       to:                   contact.phone,
       from:                 fromNumber,
-      url:                  `${baseUrl}/api/twilio/voice?${webhookParams.toString()}`,
-      statusCallback:       `${baseUrl}/api/twilio/voice/status`,
+      url:                  webhookUrl,
+      statusCallback:       statusUrl,
       statusCallbackMethod: "POST",
       method:               "POST",
     });

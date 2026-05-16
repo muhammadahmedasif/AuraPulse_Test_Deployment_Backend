@@ -25,6 +25,7 @@ const app: any = express();
 app.use(helmet()); // Security headers
 app.use(cors()); // Enable CORS
 app.use(express.json()); // Parse JSON bodies
+app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies (Twilio)
 app.use(morgan("dev")); // HTTP request logger
 
 // Routes

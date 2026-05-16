@@ -9,14 +9,22 @@
 import express from "express";
 import {
   handleVoiceWebhook,
+  handleVoiceIntro,
   handleVoiceRespond,
   handleCallStatus,
+  handleDebug,
 } from "../services/twilio/twilio-voice.controller";
 
 const router = express.Router();
 
-// Called by Twilio when the outbound call connects
+// Public debug route
+router.get("/debug",          handleDebug);
+
+// Called by Twilio when the outbound call connects (Bridge handshake)
 router.post("/voice",         handleVoiceWebhook);
+
+// Called by the bridge to play the real intro greeting
+router.post("/voice/intro",   handleVoiceIntro);
 
 // Called by Twilio when the contact finishes speaking (Gather result)
 router.post("/voice/respond", handleVoiceRespond);
