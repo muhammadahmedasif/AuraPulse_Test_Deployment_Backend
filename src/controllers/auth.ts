@@ -112,7 +112,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
-    
+
     // Send email using the nodemailer service
     await sendPasswordResetEmail(user.email, resetLink);
 
