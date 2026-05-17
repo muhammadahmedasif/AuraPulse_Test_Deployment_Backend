@@ -94,6 +94,12 @@ export const sendMessage = async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
+    // Check if session is locked (completed or archived)
+    if (session.status === "completed" || session.status === "archived") {
+      logger.warn("Attempted to message a locked session:", { sessionId, status: session.status });
+      return res.status(400).json({ message: "This session has been completed and is locked." });
+    }
+
     // ── Build context with HYBRID memory ──
     const allMessages = session.messages.map((m) => ({
       role: m.role,
@@ -291,7 +297,7 @@ export const getChatSession = async (req: Request, res: Response) => {
     const userId = req.user._id;
 
     logger.info(`Getting chat session: ${sessionId}`);
-    const chatSession = await ChatSession.findOne({ sessionId, userId });
+    const chatSession = await ChatSession.findOne({ sessionId, userId, status: { $ne: "archived" } });
 
     if (!chatSession) {
       logger.warn(`Chat session not found: ${sessionId}`);
@@ -323,8 +329,8 @@ export const getChatHistory = async (req: Request, res: Response) => {
       session = await ChatSession.findById(sessionId);
     }
 
-    if (!session) {
-      logger.warn(`Session not found in DB with either ID type`, { sessionId });
+    if (!session || session.status === "archived") {
+      logger.warn(`Session not found in DB or is archived`, { sessionId });
       return res.status(404).json({ message: "Session not found" });
     }
 
@@ -358,6 +364,7 @@ export const getUserSessions = async (req: Request, res: Response) => {
     const userId = req.user._id;
     const sessions = await ChatSession.find({ 
       userId,
+      status: { $ne: "archived" },
       "messages.0": { $exists: true }
     })
       .select("sessionId title startTime status messages")

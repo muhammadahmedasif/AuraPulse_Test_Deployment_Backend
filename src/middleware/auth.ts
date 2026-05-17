@@ -25,6 +25,10 @@ export const auth = async (req: Request, res: Response, next: NextFunction) => {
       return res.status(401).json({ message: "User not found" });
     }
 
+    if (user.status === "suspended") {
+      return res.status(403).json({ message: "Your account is suspended. Please contact support." });
+    }
+
     req.user = {
       _id: user._id as any,
       email: user.email,

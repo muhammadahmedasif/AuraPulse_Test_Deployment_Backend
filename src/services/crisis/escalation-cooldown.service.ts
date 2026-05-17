@@ -8,10 +8,8 @@
  */
 
 import { EscalationLog } from "../../models/EscalationLog";
+import { SystemSettingsService } from "./settings.service";
 import { logger } from "../../utils/logger";
-
-const COOLDOWN_HOURS = parseFloat(process.env.CRISIS_COOLDOWN_HOURS || "6");
-const MAX_PER_DAY    = parseInt(process.env.MAX_ESCALATIONS_PER_DAY  || "3");
 
 // ── In-memory session dedup ────────────────────────────────────────────────────
 // Cleared on server restart — fine for FYP; prevents repeated triggers within a session
@@ -21,7 +19,9 @@ export const EscalationCooldown = {
   // ── 1. Is user within cooldown window? ──────────────────────────────────────
   async isOnCooldown(userId: string): Promise<boolean> {
     try {
-      const cutoff = new Date(Date.now() - COOLDOWN_HOURS * 60 * 60 * 1000);
+      const settings = await SystemSettingsService.getSettings();
+      const cooldownHours = settings.cooldownHours;
+      const cutoff = new Date(Date.now() - cooldownHours * 60 * 60 * 1000);
       const count = await EscalationLog.countDocuments({
         userId,
         createdAt: { $gte: cutoff },
@@ -37,13 +37,15 @@ export const EscalationCooldown = {
   // ── 2. Has user hit the daily limit? ────────────────────────────────────────
   async isMaxPerDayReached(userId: string): Promise<boolean> {
     try {
+      const settings = await SystemSettingsService.getSettings();
+      const maxPerDay = settings.maxPerDay;
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
       const count = await EscalationLog.countDocuments({
         userId,
         createdAt: { $gte: startOfDay },
       });
-      return count >= MAX_PER_DAY;
+      return count >= maxPerDay;
     } catch (err) {
       logger.warn("[COOLDOWN] Max-per-day check failed, allowing escalation", { error: String(err) });
       return false;

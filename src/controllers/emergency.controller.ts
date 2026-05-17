@@ -146,12 +146,10 @@ export const acceptConsent = async (req: Request, res: Response) => {
 export const updateEscalationSettings = async (req: Request, res: Response) => {
   try {
     const userId   = req.user._id;
-    const { autoCallEnabled, cooldownHours, maxPerDay } = req.body;
+    const { autoCallEnabled } = req.body;
 
     const update: Record<string, any> = {};
     if (autoCallEnabled !== undefined) update["escalationSettings.autoCallEnabled"] = autoCallEnabled;
-    if (cooldownHours   !== undefined) update["escalationSettings.cooldownHours"]   = cooldownHours;
-    if (maxPerDay       !== undefined) update["escalationSettings.maxPerDay"]       = maxPerDay;
 
     const record = await EmergencyContact.findOneAndUpdate(
       { userId },

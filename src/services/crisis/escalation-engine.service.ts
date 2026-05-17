@@ -26,7 +26,7 @@ import { initiateEmergencyCall }     from "../twilio/twilio-call.service";
 import { CrisisContext }             from "./crisis-types";
 import { logger }                    from "../../utils/logger";
 
-const ESCALATION_ENABLED = process.env.CRISIS_ESCALATION_ENABLED !== "false";
+import { SystemSettingsService }     from "./settings.service";
 
 // ── Main evaluate function ─────────────────────────────────────────────────────
 export async function evaluate(
@@ -36,10 +36,10 @@ export async function evaluate(
   emotionResult: EmotionAIResult,
   userMessage:   string
 ): Promise<void> {
-  // ── Guard: system-wide switch ──────────────────────────────────────────────
-  if (!ESCALATION_ENABLED) return;
-
   try {
+    // ── Guard: system-wide switch ──────────────────────────────────────────────
+    const settings = await SystemSettingsService.getSettings();
+    if (!settings.crisisEnabled) return;
     // ── 1. Risk Assessment ─────────────────────────────────────────────────
     const assessment = assessCrisisRisk(emotionResult, userMessage);
 

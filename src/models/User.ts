@@ -8,6 +8,7 @@ export interface IUser extends Document {
   aiName: string;
   aiBehavior: "supportive" | "friendly" | "motivational" | "calm";
   aiAvatar: string;
+  status: "active" | "suspended";
 }
 
 const UserSchema = new Schema<IUser>(
@@ -23,6 +24,11 @@ const UserSchema = new Schema<IUser>(
       default: "supportive" 
     },
     aiAvatar: { type: String, default: "" },
+    status: { 
+      type: String, 
+      enum: ["active", "suspended"], 
+      default: "active" 
+    },
   },
   { timestamps: true }
 );
