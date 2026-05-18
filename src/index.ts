@@ -22,40 +22,31 @@ import { connectDB }  from "./utils/db";
 // Create Express app
 const app: any = express();
 
-// ── CORS ─────────────────────────────────────────────────────────────────────
+// Middleware
+app.use(helmet()); // Security headers
 const allowedOrigins = [
-  // User UI (local dev)
   "http://localhost:3000",
-  // Admin panel (local dev — Next.js picks the next available port if 3000 is taken)
   "http://localhost:3001",
   "http://localhost:3002",
-  "http://localhost:3003",
-  // Deployed frontends (add your Vercel URLs here)
-  "https://aura-pulse-test-deployment-backend.vercel.app",
-];
+  process.env.FRONTEND_URL,
+  process.env.ADMIN_FRONTEND_URL
+].filter(Boolean) as string[];
 
-const corsOptions: cors.CorsOptions = {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (e.g. curl, Postman, server-to-server)
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl requests)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS: origin '${origin}' not allowed`));
+    // Allow localhost for dev
+    if (origin.startsWith("http://localhost:") || allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
+    // If not allowed, return false (don't throw error to avoid 500)
+    return callback(null, false);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
-
-app.use(cors(corsOptions));
-
-// Handle preflight OPTIONS requests for all routes
-app.options("*", cors(corsOptions));
-
-// Middleware
-app.use(helmet()); // Security headers
+  allowedHeaders: ["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"]
+})); // Enable explicit CORS
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies (Twilio)
 app.use(morgan("dev")); // HTTP request logger
