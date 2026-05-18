@@ -21,21 +21,34 @@ router.get("/", requirePermission("logs.read"), async (req: Request, res: Respon
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
-    const category = (req.query.category as string) || "";
+    const category = (req.query.category as string) || "ALL";
+    const severity = (req.query.severity as string) || "ALL";
     const skip = (page - 1) * limit;
 
     const filter: Record<string, any> = {};
 
     // Map admin UI categories to real data filters
-    if (category === "CRISIS") {
-      filter.riskLevel = { $in: ["HIGH", "CRITICAL"] };
-    } else if (category === "AUTH") {
-      // Auth logs aren't stored in EscalationLog — return empty for now
+    if (category !== "ALL" && category !== "CRISIS") {
+      // We currently only store CRISIS logs in EscalationLog
       return res.json({
         logs: [],
         pagination: { total: 0, page, limit, totalPages: 0 },
       });
     }
+
+    // Determine the baseline risk levels we want for "CRISIS" logs
+    let allowedRiskLevels = ["MEDIUM", "HIGH", "CRITICAL"];
+
+    // Apply severity filter
+    if (severity === "CRITICAL") {
+      allowedRiskLevels = ["CRITICAL"];
+    } else if (severity === "WARNING") {
+      allowedRiskLevels = ["HIGH"];
+    } else if (severity === "INFO") {
+      allowedRiskLevels = ["LOW", "MEDIUM"];
+    }
+
+    filter.riskLevel = { $in: allowedRiskLevels };
 
     const [logs, total] = await Promise.all([
       EscalationLog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
