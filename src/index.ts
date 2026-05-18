@@ -24,29 +24,12 @@ const app: any = express();
 
 // Middleware
 app.use(helmet()); // Security headers
-const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:3001",
-  "http://localhost:3002",
-  process.env.FRONTEND_URL,
-  process.env.ADMIN_FRONTEND_URL
-].filter(Boolean) as string[];
-
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl requests)
-    if (!origin) return callback(null, true);
-    // Allow localhost for dev
-    if (origin.startsWith("http://localhost:") || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    // If not allowed, return false (don't throw error to avoid 500)
-    return callback(null, false);
-  },
+  origin: true, // Reflects the origin, allowing any frontend (including vercel branch previews)
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"]
-})); // Enable explicit CORS
+})); // Enable permissive CORS
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies (Twilio)
 app.use(morgan("dev")); // HTTP request logger
