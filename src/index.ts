@@ -22,9 +22,40 @@ import { connectDB }  from "./utils/db";
 // Create Express app
 const app: any = express();
 
+// ── CORS ─────────────────────────────────────────────────────────────────────
+const allowedOrigins = [
+  // User UI (local dev)
+  "http://localhost:3000",
+  // Admin panel (local dev — Next.js picks the next available port if 3000 is taken)
+  "http://localhost:3001",
+  "http://localhost:3002",
+  "http://localhost:3003",
+  // Deployed frontends (add your Vercel URLs here)
+  "https://aura-pulse-test-deployment-backend.vercel.app",
+];
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. curl, Postman, server-to-server)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS: origin '${origin}' not allowed`));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
+
+// Handle preflight OPTIONS requests for all routes
+app.options("*", cors(corsOptions));
+
 // Middleware
 app.use(helmet()); // Security headers
-app.use(cors()); // Enable CORS
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies (Twilio)
 app.use(morgan("dev")); // HTTP request logger
