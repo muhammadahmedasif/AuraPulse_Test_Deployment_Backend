@@ -12,6 +12,7 @@
  */
 
 import { Router, Request, Response } from "express";
+import mongoose from "mongoose";
 import { User } from "../../models/User";
 import { ChatSession } from "../../models/ChatSession";
 import { EmergencyContact } from "../../models/EmergencyContact";
@@ -101,6 +102,9 @@ router.get("/", requirePermission("users.read"), async (req: Request, res: Respo
 // ── GET /:id — Single user detail ─────────────────────────────────────────────
 router.get("/:id", requirePermission("users.read"), async (req: Request, res: Response) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid user ID format" });
+    }
     const user = await User.findById(req.params.id).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -147,6 +151,9 @@ router.get("/:id", requirePermission("users.read"), async (req: Request, res: Re
 // ── PATCH /:id/status — Change user status ────────────────────────────────────
 router.patch("/:id/status", requirePermission("users.block"), async (req: Request, res: Response) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid user ID format" });
+    }
     const { status } = req.body;
     if (!["active", "suspended"].includes(status)) {
       return res.status(400).json({ message: "Invalid status. Must be active or suspended." });
@@ -174,8 +181,11 @@ router.patch("/:id/status", requirePermission("users.block"), async (req: Reques
 });
 
 // ── DELETE /:id — Delete user ─────────────────────────────────────────────────
-router.delete("/:id", requirePermission("users.block"), async (req: Request, res: Response) => {
+router.delete("/:id", requirePermission("users.delete"), async (req: Request, res: Response) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid user ID format" });
+    }
     const user = await User.findByIdAndDelete(req.params.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
