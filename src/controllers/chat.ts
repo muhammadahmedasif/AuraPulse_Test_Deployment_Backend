@@ -119,11 +119,9 @@ export const sendMessage = async (req: Request, res: Response) => {
     const aiName = req.user.aiName || "Maya";
     const aiBehavior = req.user.aiBehavior || "supportive";
 
-    const prompt = buildPrompt(message, allMessages, summary, userName, latestMood, aiName, aiBehavior);
-
-    // ── Start Parallel Emotion Analysis (Non-blocking) ──
+    // ── Start Emotion Analysis (Blocking) ──
     const recentContext = allMessages.slice(-3).map(m => m.content).join(" | ");
-    const emotionPromise = analyzeUserState({
+    const emotionMeta = await analyzeUserState({
       userMessage: message,
       recentMessages: recentContext,
       sessionSummary: summary,
@@ -132,6 +130,8 @@ export const sendMessage = async (req: Request, res: Response) => {
       logger.warn("Emotion analysis failed in background", err);
       return null;
     });
+
+    const prompt = buildPrompt(message, allMessages, summary, userName, latestMood, aiName, aiBehavior, emotionMeta?.suggestedActivity);
 
     // ── Abort on client disconnect ──
     const abortController = new AbortController();
@@ -166,10 +166,6 @@ export const sendMessage = async (req: Request, res: Response) => {
       fallbackUsed,
       replyLength: reply.length,
     });
-
-    // ── Await Emotion Analysis ──
-    // This is safe because it's fast and we are already done streaming text.
-    const emotionMeta = await emotionPromise;
 
     // ── Crisis Escalation (async fire-and-forget — NEVER blocks chat) ──────
     if (emotionMeta) {

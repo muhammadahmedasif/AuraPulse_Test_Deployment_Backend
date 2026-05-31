@@ -77,7 +77,8 @@ export function buildPrompt(
   userName?: string,
   latestMood?: "low" | "neutral" | "positive" | "unknown",
   aiName: string = "Maya",
-  aiBehavior: string = "supportive"
+  aiBehavior: string = "supportive",
+  suggestedActivity?: string | null
 ): string {
   const parts: string[] = [];
   const messageCount = allMessages.length;
@@ -93,6 +94,12 @@ export function buildPrompt(
     if (allMessages.length <= 1) {
       systemPrompt += `\nSince this is the beginning of the conversation, warmly and gently acknowledge this mood and ask how they are feeling today. If they were feeling low, make sure to console them first.`;
     }
+  }
+
+  if (suggestedActivity) {
+    systemPrompt += `\n\nIMPORTANT: You are suggesting the "${suggestedActivity}" activity to the user. You MUST include this exact sentence in your response: "let me help you with this ${suggestedActivity} activity this might help you improve your mood".`;
+  } else {
+    systemPrompt += `\n\nIMPORTANT: Do not suggest any activities or say "let me help you with this..." in this response.`;
   }
 
   parts.push(systemPrompt);
