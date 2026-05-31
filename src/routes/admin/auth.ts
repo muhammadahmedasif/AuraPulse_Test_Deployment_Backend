@@ -221,7 +221,7 @@ router.post("/upload-avatar", adminAuth, upload.single("image") as any, async (r
   }
 });
 
-// â”€â”€ DELETE /delete-avatar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// DELETE /delete-avatar 
 router.delete("/delete-avatar", adminAuth, async (req: Request, res: Response) => {
   try {
     const currentAdmin = await Admin.findById(req.admin!._id).select("profileImage");
