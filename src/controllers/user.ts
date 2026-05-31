@@ -1,7 +1,55 @@
 import { Request, Response, RequestHandler } from "express";
 import { User } from "../models/User";
 import { logger } from "../utils/logger";
-import { uploadImage } from "../services/cloudinary.service";
+import { deleteImage, uploadImage } from "../services/cloudinary.service";
+
+type AvatarField = "profileImage" | "aiAvatar";
+
+const clearAvatarField = async (
+  req: Request,
+  res: Response,
+  field: AvatarField,
+  successMessage: string
+) => {
+  if (!req.user) {
+    console.error("USER UNDEFINED - AUTH FAILED");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const userId = req.user._id;
+    const currentUser = await User.findById(userId).select("profileImage aiAvatar");
+
+    if (!currentUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const existingImageUrl = field === "profileImage" ? currentUser.profileImage : currentUser.aiAvatar;
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $set: { [field]: "" } },
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    await deleteImage(existingImageUrl);
+
+    res.status(200).json({
+      message: successMessage,
+      user,
+    });
+  } catch (err: any) {
+    console.error(`ERROR (clear ${field}):`, err);
+    res.status(500).json({
+      message: "Internal error",
+      error: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined
+    });
+  }
+};
 
 /**
  * Update user profile details (name, email, profileImage)
@@ -135,4 +183,18 @@ export const uploadAiAvatar: RequestHandler = async (req, res) => {
       stack: process.env.NODE_ENV === "development" ? err.stack : undefined
     });
   }
+};
+
+/**
+ * Delete profile avatar from user profile and Cloudinary
+ */
+export const deleteAvatar: RequestHandler = async (req, res) => {
+  await clearAvatarField(req, res, "profileImage", "Avatar deleted successfully");
+};
+
+/**
+ * Delete AI avatar from user profile and Cloudinary
+ */
+export const deleteAiAvatar: RequestHandler = async (req, res) => {
+  await clearAvatarField(req, res, "aiAvatar", "AI avatar deleted successfully");
 };

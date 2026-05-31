@@ -32,3 +32,47 @@ export const uploadImage = (fileBuffer: Buffer): Promise<string> => {
     uploadStream.end(fileBuffer);
   });
 };
+
+const getPublicIdFromUrl = (imageUrl?: string): string | null => {
+  if (!imageUrl) return null;
+
+  try {
+    const url = new URL(imageUrl);
+    const uploadIndex = url.pathname.indexOf("/upload/");
+
+    if (!url.hostname.includes("cloudinary.com") || uploadIndex === -1) {
+      return null;
+    }
+
+    const afterUpload = url.pathname.slice(uploadIndex + "/upload/".length);
+    const pathParts = afterUpload.split("/").filter(Boolean);
+
+    if (pathParts[0]?.match(/^v\d+$/)) {
+      pathParts.shift();
+    }
+
+    const publicIdWithExtension = pathParts.join("/");
+    return decodeURIComponent(publicIdWithExtension).replace(/\.[^/.]+$/, "") || null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Delete a Cloudinary image using its delivered URL.
+ */
+export const deleteImage = async (imageUrl?: string): Promise<boolean> => {
+  const publicId = getPublicIdFromUrl(imageUrl);
+
+  if (!publicId) {
+    return false;
+  }
+
+  try {
+    const result = await cloudinary.uploader.destroy(publicId, { resource_type: "image" });
+    return result.result === "ok" || result.result === "not found";
+  } catch (error) {
+    logger.error("Cloudinary delete error:", error);
+    return false;
+  }
+};

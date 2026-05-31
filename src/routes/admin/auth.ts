@@ -16,7 +16,7 @@ import multer from "multer";
 import { Admin } from "../../models/Admin";
 import { adminAuth } from "../../middleware/adminAuth";
 import { sendPasswordResetEmail } from "../../services/email.service";
-import { uploadImage } from "../../services/cloudinary.service";
+import { deleteImage, uploadImage } from "../../services/cloudinary.service";
 import { logger } from "../../utils/logger";
 
 const router = Router();
@@ -218,6 +218,46 @@ router.post("/upload-avatar", adminAuth, upload.single("image") as any, async (r
   } catch (error: any) {
     logger.error("[ADMIN_AUTH] Upload avatar error", { error: String(error) });
     res.status(500).json({ message: "Failed to upload image", error: error.message });
+  }
+});
+
+// â”€â”€ DELETE /delete-avatar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+router.delete("/delete-avatar", adminAuth, async (req: Request, res: Response) => {
+  try {
+    const currentAdmin = await Admin.findById(req.admin!._id).select("profileImage");
+
+    if (!currentAdmin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    const existingImageUrl = currentAdmin.profileImage;
+    const admin = await Admin.findByIdAndUpdate(
+      req.admin!._id,
+      { $set: { profileImage: "" } },
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    await deleteImage(existingImageUrl);
+
+    res.status(200).json({
+      message: "Profile image deleted successfully",
+      admin: {
+        _id: admin._id,
+        name: admin.name,
+        email: admin.email,
+        profileImage: admin.profileImage,
+        role: admin.role,
+        permissions: admin.permissions,
+        lastLogin: admin.lastLogin,
+      },
+    });
+  } catch (error: any) {
+    logger.error("[ADMIN_AUTH] Delete avatar error", { error: String(error) });
+    res.status(500).json({ message: "Failed to delete image", error: error.message });
   }
 });
 
