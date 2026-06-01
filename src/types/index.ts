@@ -10,6 +10,7 @@ export interface AuthUser {
   aiName: string;
   aiBehavior: string;
   aiAvatar: string;
+  aiVoice?: string;
 }
 
 export interface MessageAnalysis {
