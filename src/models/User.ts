@@ -8,6 +8,7 @@ export interface IUser extends Document {
   aiName: string;
   aiBehavior: "supportive" | "friendly" | "motivational" | "calm";
   aiAvatar: string;
+  aiVoice: string;
   status: "active" | "suspended";
 }
 
@@ -24,6 +25,7 @@ const UserSchema = new Schema<IUser>(
       default: "supportive" 
     },
     aiAvatar: { type: String, default: "" },
+    aiVoice: { type: String, default: "" },
     status: { 
       type: String, 
       enum: ["active", "suspended"], 

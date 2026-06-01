@@ -62,7 +62,7 @@ export const updateProfile: RequestHandler = async (req, res) => {
 
   try {
     const userId = req.user._id;
-    const { name, email, profileImage, aiName, aiBehavior, aiAvatar } = req.body;
+    const { name, email, profileImage, aiName, aiBehavior, aiAvatar, aiVoice } = req.body;
 
     const updateData: any = {};
     if (name) updateData.name = name;
@@ -71,6 +71,7 @@ export const updateProfile: RequestHandler = async (req, res) => {
     if (aiName !== undefined) updateData.aiName = aiName;
     if (aiBehavior !== undefined) updateData.aiBehavior = aiBehavior;
     if (aiAvatar !== undefined) updateData.aiAvatar = aiAvatar;
+    if (aiVoice !== undefined) updateData.aiVoice = aiVoice;
 
     const user = await User.findByIdAndUpdate(
       userId,
