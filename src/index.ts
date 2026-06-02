@@ -17,6 +17,7 @@ import userRouter     from "./routes/user";
 import emergencyRouter from "./routes/emergency";
 import twilioRouter   from "./routes/twilio";
 import adminRouter    from "./routes/admin";
+import progressRouter from "./routes/progress";
 import { connectDB }  from "./utils/db";
 
 // Create Express app
@@ -48,6 +49,7 @@ app.use("/api/user",      userRouter);
 app.use("/api/emergency", emergencyRouter);
 app.use("/api/twilio",    twilioRouter);
 app.use("/api/admin",     adminRouter);
+app.use("/api/progress",  progressRouter);
 
 // Backward compatibility
 app.use("/auth", authRouter);
