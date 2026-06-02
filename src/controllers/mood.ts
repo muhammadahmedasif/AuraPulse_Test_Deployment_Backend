@@ -15,23 +15,25 @@ export const createMood = async (
   }
 
   try {
-    const { score, note } = req.body;
+    const { score, note, source, mood } = req.body;
     const userId = req.user._id;
 
 
-    const mood = new Mood({
+    const moodEntry = new Mood({
       userId,
       score,
       note,
+      source: source || "slider",
+      mood: mood || null,
       timestamp: new Date(),
     });
 
-    await mood.save();
+    await moodEntry.save();
     logger.info(`Mood entry created for user ${userId}`);
 
     res.status(201).json({
       success: true,
-      data: mood,
+      data: moodEntry,
     });
   } catch (err: any) {
     console.error("ERROR (createMood):", err);

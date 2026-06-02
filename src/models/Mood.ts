@@ -4,6 +4,8 @@ export interface IMood extends Document {
   userId: mongoose.Types.ObjectId;
   score: number;
   note?: string;
+  source?: string;
+  mood?: string;
   timestamp: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -25,6 +27,15 @@ const moodSchema = new Schema<IMood>(
     note: {
       type: String,
       trim: true,
+    },
+    source: {
+      type: String,
+      enum: ["camera", "slider"],
+      default: "slider",
+    },
+    mood: {
+      type: String,
+      default: null,
     },
     timestamp: {
       type: Date,
