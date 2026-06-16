@@ -14,6 +14,8 @@ import { MessageAnalysis } from "../types";
 import { Mood } from "../models/Mood";
 import { analyzeUserState } from "../services/emotionAI.service";
 import * as escalationEngine from "../services/crisis/escalation-engine.service";
+import { fuseEmotion, buildFusionContext } from "../services/emotionFusion.service";
+import { FusionInput } from "../services/emotionWeights";
 
 
 // ── Default Analysis (until real analysis is implemented) ──────
@@ -131,7 +133,51 @@ export const sendMessage = async (req: Request, res: Response) => {
       return null;
     });
 
-    const prompt = buildPrompt(message, allMessages, summary, userName, latestMood, aiName, aiBehavior, emotionMeta?.suggestedActivity);
+    // ── Emotion Fusion ──
+    let fusionContextStr: string | undefined;
+    try {
+      const recentMoods = await Mood.find({ userId })
+        .sort({ timestamp: -1 })
+        .limit(5)
+        .lean();
+
+      let historyScore: number | undefined;
+      if (recentMoods.length > 0) {
+        historyScore = Math.round(
+          recentMoods.reduce((sum, m) => sum + m.score, 0) / recentMoods.length
+        );
+      }
+
+      const fusionInput: FusionInput = {
+        textEmotion: emotionMeta?.emotion,
+        faceScore: latestMoodDoc?.source === "camera" ? latestMoodDoc.score : undefined,
+        faceMood: latestMoodDoc?.source === "camera" ? (latestMoodDoc.mood ?? undefined) : undefined,
+        historyScore,
+      };
+
+      const fusionResult = fuseEmotion(fusionInput);
+      fusionContextStr = buildFusionContext(fusionResult, fusionInput);
+
+      logger.info("🔀 Emotion Fusion", {
+        score: fusionResult.score,
+        mood: fusionResult.mood,
+        confidence: fusionResult.confidence,
+        mismatch: fusionResult.mismatch,
+        sources: fusionResult.sources,
+      });
+
+      console.log("\n================ [TEMPORARY FUSION LOG] ================");
+      console.log("Fusion Input:", JSON.stringify(fusionInput, null, 2));
+      console.log("Fusion Result:", JSON.stringify(fusionResult, null, 2));
+      console.log("Injected Context String:\n" + fusionContextStr);
+      console.log("========================================================\n");
+    } catch (err) {
+      logger.warn("Emotion fusion failed, continuing without", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    const prompt = buildPrompt(message, allMessages, summary, userName, latestMood, aiName, aiBehavior, emotionMeta?.suggestedActivity, fusionContextStr);
 
     // ── Abort on client disconnect ──
     const abortController = new AbortController();

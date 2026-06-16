@@ -78,7 +78,8 @@ export function buildPrompt(
   latestMood?: "low" | "neutral" | "positive" | "unknown",
   aiName: string = "Maya",
   aiBehavior: string = "supportive",
-  suggestedActivity?: string | null
+  suggestedActivity?: string | null,
+  fusionContext?: string
 ): string {
   const parts: string[] = [];
   const messageCount = allMessages.length;
@@ -103,6 +104,11 @@ export function buildPrompt(
   }
 
   parts.push(systemPrompt);
+
+  // ── Layer 1.5: Fusion Emotional Context (if available) ──
+  if (fusionContext) {
+    parts.push(`[Current Emotional Context]\n${fusionContext}`);
+  }
 
   // ── Layer 2: Long-term Memory (Summary) ──
   if (summary && summary.trim()) {
