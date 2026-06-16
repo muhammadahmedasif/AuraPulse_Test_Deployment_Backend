@@ -14,33 +14,42 @@ import {
 
 const MISMATCH_THRESHOLD = 25;
 
+function isValidScore(value: unknown): value is number {
+  return typeof value === "number" && !Number.isNaN(value) && isFinite(value);
+}
+
 export function fuseEmotion(input: FusionInput): FusionResult {
   const sources: { key: string; score: number; weight: number }[] = [];
   const sourceLabels: string[] = [];
 
   // Resolve text score
-  const textScore = input.textScore ?? (input.textEmotion ? textEmotionToScore(input.textEmotion) : undefined);
-  if (textScore !== undefined) {
+  let textScore: number | undefined;
+  if (isValidScore(input.textScore)) {
+    textScore = input.textScore;
+  } else if (input.textEmotion) {
+    textScore = textEmotionToScore(input.textEmotion);
+  }
+  if (textScore !== undefined && isValidScore(textScore)) {
     sources.push({ key: "text", score: textScore, weight: FUSION_WEIGHTS.text });
     sourceLabels.push("text");
   }
 
-  if (input.faceScore !== undefined) {
+  if (isValidScore(input.faceScore)) {
     sources.push({ key: "face", score: input.faceScore, weight: FUSION_WEIGHTS.face });
     sourceLabels.push("face");
   }
 
-  if (input.voiceScore !== undefined) {
+  if (isValidScore(input.voiceScore)) {
     sources.push({ key: "voice", score: input.voiceScore, weight: FUSION_WEIGHTS.voice });
     sourceLabels.push("voice");
   }
 
-  if (input.historyScore !== undefined) {
+  if (isValidScore(input.historyScore)) {
     sources.push({ key: "history", score: input.historyScore, weight: FUSION_WEIGHTS.history });
     sourceLabels.push("history");
   }
 
-  // Nothing to fuse
+  // Nothing to fuse — return safe neutral fallback
   if (sources.length === 0) {
     return {
       score: 50,
@@ -59,20 +68,16 @@ export function fuseEmotion(input: FusionInput): FusionResult {
     normalizedWeight: s.weight / totalWeight,
   }));
 
-  // Weighted score
-  const finalScore = Math.round(
-    normalizedSources.reduce((sum, s) => sum + s.score * s.normalizedWeight, 0)
-  );
+  // Weighted score — guard against NaN
+  const rawFinalScore = normalizedSources.reduce((sum, s) => sum + s.score * s.normalizedWeight, 0);
+  const finalScore = isValidScore(rawFinalScore) ? Math.round(rawFinalScore) : 50;
 
   // Mismatch detection (text vs face)
   let mismatch = false;
-  let explanation = "";
-
-  if (textScore !== undefined && input.faceScore !== undefined) {
+  if (isValidScore(textScore) && isValidScore(input.faceScore)) {
     const diff = Math.abs(textScore - input.faceScore);
     if (diff > MISMATCH_THRESHOLD) {
       mismatch = true;
-      explanation = "Text and facial signals show different emotional patterns";
     }
   }
 
@@ -83,16 +88,15 @@ export function fuseEmotion(input: FusionInput): FusionResult {
   } else {
     const scores = sources.map(s => s.score);
     const maxDiff = Math.max(...scores) - Math.min(...scores);
-    // maxDiff 0 → confidence 0.95, maxDiff 100 → confidence 0.4
-    confidence = Math.round((0.95 - (maxDiff / 100) * 0.55) * 100) / 100;
-    confidence = Math.max(0.4, Math.min(0.95, confidence));
+    const rawConfidence = 0.95 - (maxDiff / 100) * 0.55;
+    confidence = isValidScore(rawConfidence)
+      ? Math.round(Math.max(0.4, Math.min(0.95, rawConfidence)) * 100) / 100
+      : 0.6;
   }
 
-  if (!explanation) {
-    explanation = confidence >= 0.8
-      ? "Emotional signals are consistent"
-      : "Emotional signals show some variation";
-  }
+  const explanation = mismatch
+    ? "Text and other emotional signals show some difference. Prioritize the user's own words while maintaining a supportive tone."
+    : "Emotional signals are consistent.";
 
   return {
     score: Math.max(0, Math.min(100, finalScore)),
@@ -105,28 +109,17 @@ export function fuseEmotion(input: FusionInput): FusionResult {
 }
 
 /**
- * Builds a human-readable context string for LLM injection.
+ * Builds a concise guidance string for LLM injection.
+ * Outputs descriptive human-readable guidance — no raw scores, no analytics.
  */
-export function buildFusionContext(result: FusionResult, input: FusionInput): string {
-  const lines: string[] = [
-    `Estimated mood: ${result.mood}`,
-    `Score: ${result.score}/100`,
-    `Confidence: ${result.confidence}`,
-  ];
-
-  const signals: string[] = [];
-  if (input.textEmotion) signals.push(`Text: ${input.textEmotion}`);
-  if (input.faceMood) signals.push(`Face: ${input.faceMood}`);
-  else if (input.faceScore !== undefined) signals.push(`Face score: ${input.faceScore}`);
-  if (input.voiceScore !== undefined) signals.push(`Voice score: ${input.voiceScore}`);
-  if (input.historyScore !== undefined) signals.push(`History average: ${input.historyScore}`);
-
-  if (signals.length > 0) {
-    lines.push(`Signals: ${signals.join(", ")}`);
-  }
+export function buildFusionContext(result: FusionResult, _input: FusionInput): string {
+  const lines: string[] = ["[Emotional Guidance]"];
+  lines.push(`The user's current emotional state appears to be ${result.mood}.`);
 
   if (result.mismatch) {
-    lines.push(`Note: ${result.explanation}`);
+    lines.push(result.explanation);
+  } else if (result.confidence >= 0.8) {
+    lines.push("Emotional signals are consistent. Respond naturally.");
   }
 
   return lines.join("\n");
