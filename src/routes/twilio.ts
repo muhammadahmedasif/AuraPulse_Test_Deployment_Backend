@@ -14,6 +14,7 @@ import {
   handleCallStatus,
   handleDebug,
 } from "../services/twilio/twilio-voice.controller";
+import { handleWhatsAppWebhook } from "../services/twilio/twilio-whatsapp.controller";
 
 const router = express.Router();
 
@@ -31,5 +32,8 @@ router.post("/voice/respond", handleVoiceRespond);
 
 // Called by Twilio on call status changes (ringing, completed, failed, etc.)
 router.post("/voice/status",  handleCallStatus);
+
+// Called by Twilio for incoming WhatsApp messages
+router.post("/whatsapp", handleWhatsAppWebhook);
 
 export default router;

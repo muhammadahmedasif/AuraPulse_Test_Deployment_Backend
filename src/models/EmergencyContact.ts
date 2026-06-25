@@ -4,7 +4,9 @@ import { Schema, model, Document, Types } from "mongoose";
 interface IContactEntry {
   name: string;
   relationship: string;
-  phone: string;         // E.164 format, e.g. +923001234567
+  phone?: string;         // E.164 format, e.g. +923001234567
+  whatsappNumber?: string; // E.164 format
+  preferredContactMethod: "phone" | "whatsapp" | "both";
   priority: number;      // 1 = highest priority
   enabled: boolean;
 }
@@ -24,11 +26,20 @@ export interface IEmergencyContact extends Document {
 const ContactEntrySchema = new Schema<IContactEntry>({
   name:         { type: String, required: true, trim: true },
   relationship: { type: String, required: true, trim: true },
+  preferredContactMethod: { 
+    type: String, 
+    enum: ["phone", "whatsapp", "both"], 
+    default: "phone" 
+  },
   phone:        {
     type: String,
-    required: true,
-    // Validate E.164 format: +[country code][number]
+    required: function(this: any) { return this.preferredContactMethod !== "whatsapp"; },
     match: [/^\+[1-9]\d{7,14}$/, "Phone must be in E.164 format (e.g. +923001234567)"],
+  },
+  whatsappNumber: {
+    type: String,
+    required: function(this: any) { return this.preferredContactMethod === "whatsapp" || this.preferredContactMethod === "both"; },
+    match: [/^\+[1-9]\d{7,14}$/, "WhatsApp number must be in E.164 format"],
   },
   priority:     { type: Number, default: 1, min: 1, max: 10 },
   enabled:      { type: Boolean, default: true },

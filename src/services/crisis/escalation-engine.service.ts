@@ -23,6 +23,7 @@ import { buildEmergencyCallContext } from "./escalation-memory.service";
 import { EmergencyContact }          from "../../models/EmergencyContact";
 import { EscalationLog }             from "../../models/EscalationLog";
 import { initiateEmergencyCall }     from "../twilio/twilio-call.service";
+import { initiateEmergencyWhatsApp } from "../twilio/twilio-whatsapp.service";
 import { CrisisContext }             from "./crisis-types";
 import { logger }                    from "../../utils/logger";
 
@@ -151,15 +152,37 @@ export async function evaluate(
       outcome:          "initiated",
     });
 
-    // ── 8. Initiate Twilio call ───────────────────────────────────────────
-    logger.info("[TWILIO_CALL_ATTEMPT]", { userId, sessionId, contact: primaryContact.name });
-    const callResult = await initiateEmergencyCall(crisisContext, {
-      name:         primaryContact.name,
-      phone:        primaryContact.phone,
-      relationship: primaryContact.relationship,
-    });
+    // ── 8. Initiate Emergency Contact Methods ─────────────────────────────────
+    const method = primaryContact.preferredContactMethod || "phone";
+    logger.info(`[ESCALATION_ENGINE] Selected method: ${method}`);
 
-    if (callResult.success && callResult.callSid) {
+    let callResult: any = { success: false, callSid: "", error: "" };
+    let whatsappResult: any = { success: false, callSid: "", error: "" };
+
+    const contactInfo = {
+      name:         primaryContact.name,
+      phone:        primaryContact.phone || "",
+      whatsappNumber: primaryContact.whatsappNumber || "",
+      relationship: primaryContact.relationship,
+    };
+
+    if (method === "phone" || method === "both") {
+      logger.info("[TWILIO_CALL_ATTEMPT]", { userId, sessionId, contact: primaryContact.name });
+      callResult = await initiateEmergencyCall(crisisContext, contactInfo);
+    }
+
+    if (method === "whatsapp" || method === "both") {
+      whatsappResult = await initiateEmergencyWhatsApp(crisisContext, contactInfo as any);
+    }
+
+    // Determine overall success
+    const success = (method === "both" && (callResult.success || whatsappResult.success)) ||
+                    (method === "phone" && callResult.success) ||
+                    (method === "whatsapp" && whatsappResult.success);
+
+    const activeSid = callResult.callSid || whatsappResult.callSid;
+
+    if (success && activeSid) {
       EscalationLogger.callStarted({
         userId,
         sessionId,
@@ -170,15 +193,16 @@ export async function evaluate(
         callSid: callResult.callSid,
       });
     } else {
+      const combinedError = [callResult.error, whatsappResult.error].filter(Boolean).join(" | ");
       EscalationLogger.callFailed({
         userId,
         sessionId,
         contactCalled: primaryContact.name,
-        error:         callResult.error || "Unknown Twilio error",
+        error:         combinedError || "Unknown Twilio error",
       });
       await EscalationLog.findByIdAndUpdate(logEntry._id, {
         outcome: "failed",
-        error:   callResult.error,
+        error:   combinedError,
       });
     }
 

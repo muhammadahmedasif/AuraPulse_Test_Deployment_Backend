@@ -26,10 +26,18 @@ export const getEmergencyContacts = async (req: Request, res: Response) => {
 export const addEmergencyContact = async (req: Request, res: Response) => {
   try {
     const userId = req.user._id;
-    const { name, relationship, phone, priority, enabled } = req.body;
+    const { name, relationship, phone, whatsappNumber, preferredContactMethod, priority, enabled } = req.body;
 
-    if (!name || !phone || !relationship) {
-      return res.status(400).json({ message: "name, phone, and relationship are required" });
+    if (!name || !relationship) {
+      return res.status(400).json({ message: "Name and relationship are required" });
+    }
+
+    const method = preferredContactMethod || "phone";
+    if ((method === "phone" || method === "both") && !phone) {
+      return res.status(400).json({ message: "Phone number is required for phone method" });
+    }
+    if ((method === "whatsapp" || method === "both") && !whatsappNumber) {
+      return res.status(400).json({ message: "WhatsApp number is required for whatsapp method" });
     }
 
     let record = await EmergencyContact.findOne({ userId });
@@ -51,7 +59,9 @@ export const addEmergencyContact = async (req: Request, res: Response) => {
     record.contacts.push({
       name: name.trim(),
       relationship: relationship.trim(),
-      phone,
+      preferredContactMethod: method,
+      phone: phone || undefined,
+      whatsappNumber: whatsappNumber || undefined,
       priority: priority || record.contacts.length + 1,
       enabled: enabled !== false,
     });
@@ -83,7 +93,9 @@ export const updateEmergencyContact = async (req: Request, res: Response) => {
 
     if (updates.name)         contact.name         = updates.name.trim();
     if (updates.relationship) contact.relationship = updates.relationship.trim();
-    if (updates.phone)        contact.phone        = updates.phone;
+    if (updates.preferredContactMethod) contact.preferredContactMethod = updates.preferredContactMethod;
+    if (updates.phone !== undefined) contact.phone = updates.phone;
+    if (updates.whatsappNumber !== undefined) contact.whatsappNumber = updates.whatsappNumber;
     if (updates.priority !== undefined) contact.priority = updates.priority;
     if (updates.enabled  !== undefined) contact.enabled  = updates.enabled;
 
