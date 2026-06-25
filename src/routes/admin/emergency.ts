@@ -51,6 +51,7 @@ router.get("/logs", requirePermission("emergency.read"), async (req: Request, re
           escalationReason: log.escalationReason,
           contactCalled: log.contactCalled,
           contactPhone: log.contactPhone,
+          contactWhatsApp: log.contactWhatsApp,
           callSid: log.callSid,
           outcome: log.outcome,
           error: log.error,
@@ -119,11 +120,9 @@ router.get("/status", requirePermission("emergency.read"), async (req: Request, 
     ]);
 
     // Check Twilio config
-    const twilioConfigured = !!(
-      process.env.TWILIO_ACCOUNT_SID &&
-      process.env.TWILIO_AUTH_TOKEN &&
-      process.env.TWILIO_PHONE_NUMBER
-    );
+    const twilioConfigured = !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN);
+    const twilioPhone = process.env.TWILIO_PHONE_NUMBER || "Not configured";
+    const twilioWhatsApp = process.env.TWILIO_WHATSAPP_NUMBER || "Not configured";
 
     const settings = await SystemSettingsService.getSettings();
     const crisisEnabled = settings.crisisEnabled;
@@ -135,6 +134,7 @@ router.get("/status", requirePermission("emergency.read"), async (req: Request, 
         crisisEnabled,
         twilioConfigured,
         twilioPhone: process.env.TWILIO_PHONE_NUMBER || "Not configured",
+        twilioWhatsApp: process.env.TWILIO_WHATSAPP_NUMBER || "Not configured",
         cooldownHours,
         maxPerDay,
       },

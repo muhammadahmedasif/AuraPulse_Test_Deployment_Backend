@@ -9,6 +9,7 @@ export interface IEscalationLog extends Document {
   escalationReason: string;
   contactCalled?: string;
   contactPhone?: string;
+  contactWhatsApp?: string;
   callSid?: string;
   outcome: "initiated" | "completed" | "failed" | "blocked";
   error?: string;
@@ -25,6 +26,7 @@ const EscalationLogSchema = new Schema<IEscalationLog>(
     escalationReason: { type: String, default: "" },
     contactCalled:    { type: String },
     contactPhone:     { type: String },
+    contactWhatsApp:  { type: String },
     callSid:          { type: String },
     outcome:          {
       type: String,

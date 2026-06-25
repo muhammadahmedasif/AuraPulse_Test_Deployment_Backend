@@ -149,6 +149,7 @@ export async function evaluate(
       escalationReason: assessment.escalationReason || "severe distress",
       contactCalled:    primaryContact.name,
       contactPhone:     primaryContact.phone,
+      contactWhatsApp:  primaryContact.whatsappNumber,
       outcome:          "initiated",
     });
 
