@@ -12,7 +12,7 @@ export const handleWhatsAppWebhook = async (req: Request, res: Response) => {
     // From is typically "whatsapp:+923001234567"
     const contactWhatsApp = From.replace("whatsapp:", "");
     
-    const session = twilioWhatsAppSessionManager.get(contactWhatsApp);
+    const session = await twilioWhatsAppSessionManager.get(contactWhatsApp);
 
     const twiml = new twilio.twiml.MessagingResponse();
 
@@ -24,7 +24,7 @@ export const handleWhatsAppWebhook = async (req: Request, res: Response) => {
     }
 
     // Save user's reply
-    twilioWhatsAppSessionManager.updateHistory(contactWhatsApp, { role: "user", content: Body });
+    await twilioWhatsAppSessionManager.updateHistory(contactWhatsApp, { role: "user", content: Body });
 
     // Format context for the LLM
     const systemPrompt = `You are an AI Emergency Coordinator for an AI therapy application called AuraPulse.
@@ -52,7 +52,7 @@ ${session.conversationHistory.map(m => `[${m.role.toUpperCase()}]: ${m.content}`
     logger.info(`[TWILIO_WHATSAPP] Generating AI response for ${contactWhatsApp}...`);
     const aiResponse = await generate(systemPrompt, { maxTokens: 200, temperature: 0.5 });
     
-    twilioWhatsAppSessionManager.updateHistory(contactWhatsApp, { role: "assistant", content: aiResponse });
+    await twilioWhatsAppSessionManager.updateHistory(contactWhatsApp, { role: "assistant", content: aiResponse });
 
     twiml.message(aiResponse);
 

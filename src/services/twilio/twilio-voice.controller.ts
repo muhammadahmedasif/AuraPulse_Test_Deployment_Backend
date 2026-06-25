@@ -69,7 +69,7 @@ export const handleVoiceWebhook = async (req: Request, res: Response): Promise<v
     });
 
     // 2. Background work: Ensure session is initialized
-    let callSession = twilioSessionManager.get(callSid);
+    let callSession = await twilioSessionManager.get(callSid);
     if (!callSession && userId) {
       const assessment: CrisisAssessment = {
         riskLevel: (riskLevel as any) || "HIGH",
@@ -80,7 +80,7 @@ export const handleVoiceWebhook = async (req: Request, res: Response): Promise<v
         recommendedAction: "Please check on this person immediately",
       };
 
-      twilioSessionManager.set(callSid, {
+      await twilioSessionManager.set(callSid, {
         callSid, userId, sessionId,
         contactName, contactPhone: "",
         crisisContext: {
@@ -112,7 +112,7 @@ export const handleVoiceIntro = async (req: Request, res: Response): Promise<voi
     const contactName = (req.query.contactName as string) || "there";
     const userName    = (req.query.userName as string) || "someone";
 
-    const callSession = twilioSessionManager.get(callSid);
+    const callSession = await twilioSessionManager.get(callSid);
     
     if (!callSession) {
       const twiml = buildClosingTwiML("Hello, we are calling regarding a wellness concern for " + userName + ". Please reach out to them. Goodbye.");
@@ -123,7 +123,7 @@ export const handleVoiceIntro = async (req: Request, res: Response): Promise<voi
 
     const opening = buildOpeningMessage(contactName, userName, callSession.crisisContext);
     
-    twilioSessionManager.update(callSid, {
+    await twilioSessionManager.update(callSid, {
       conversationHistory: [{ role: "ai", content: opening }],
     });
 
@@ -135,8 +135,8 @@ export const handleVoiceIntro = async (req: Request, res: Response): Promise<voi
 
     // Optional: Kick off background context building
     if (callSession.crisisContext.emotionalSummary.includes("handshake")) {
-       void buildEmergencyCallContext(callSession.sessionId, callSession.userId).then(summary => {
-         twilioSessionManager.update(callSid, {
+       void buildEmergencyCallContext(callSession.sessionId, callSession.userId).then(async summary => {
+         await twilioSessionManager.update(callSid, {
            crisisContext: { ...callSession.crisisContext, emotionalSummary: summary }
          });
        });
@@ -172,7 +172,7 @@ export const handleVoiceRespond = async (req: Request, res: Response): Promise<v
     const speechResult = (req.body?.SpeechResult || "").trim();
     logger.info("[TWILIO_CONTACT_SPOKE]", { callSid, speech: speechResult.slice(0, 80) });
 
-    const callSession = twilioSessionManager.get(callSid);
+    const callSession = await twilioSessionManager.get(callSid);
 
     if (!callSession) {
       const twiml = buildClosingTwiML("Thank you for your time. Please reach out to the individual directly. Goodbye.");
@@ -206,7 +206,7 @@ export const handleVoiceRespond = async (req: Request, res: Response): Promise<v
     const aiResponse = await generate(prompt, { maxTokens: 120, temperature: 0.6 });
     const cleanResponse = aiResponse.trim() || "I understand. Please reach out to them immediately.";
 
-    twilioSessionManager.update(callSid, {
+    await twilioSessionManager.update(callSid, {
       conversationHistory: [
         ...updatedHistory,
         { role: "ai" as const, content: cleanResponse },
@@ -232,17 +232,17 @@ export const handleCallStatus = async (req: Request, res: Response): Promise<voi
     const { CallSid, CallStatus, CallDuration } = req.body;
     logger.info("[TWILIO_STATUS_CALLBACK]", { callSid: CallSid, status: CallStatus, duration: CallDuration });
 
-    const callSession = twilioSessionManager.get(CallSid);
+    const callSession = await twilioSessionManager.get(CallSid);
     const userId = callSession?.userId;
 
     if (CallStatus === "completed") {
       EscalationLogger.callCompleted({ userId: userId || "unknown", callSid: CallSid });
       await EscalationLog.findOneAndUpdate({ callSid: CallSid }, { outcome: "completed", duration: CallDuration });
-      twilioSessionManager.delete(CallSid);
+      await twilioSessionManager.delete(CallSid);
     } else if (["failed", "busy", "no-answer", "canceled"].includes(CallStatus)) {
       EscalationLogger.callFailed({ userId: userId || "unknown", callSid: CallSid, error: CallStatus });
       await EscalationLog.findOneAndUpdate({ callSid: CallSid }, { outcome: "failed", error: CallStatus });
-      twilioSessionManager.delete(CallSid);
+      await twilioSessionManager.delete(CallSid);
     }
 
     res.sendStatus(204);

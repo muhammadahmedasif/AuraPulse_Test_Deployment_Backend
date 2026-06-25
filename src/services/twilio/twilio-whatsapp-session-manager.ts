@@ -10,31 +10,44 @@ export interface ActiveWhatsAppSession {
   startedAt: Date;
 }
 
-// In-memory store for active WhatsApp sessions.
-// Keyed by the contact's WhatsApp number (e.g. "+923001234567")
-const sessions = new Map<string, ActiveWhatsAppSession>();
+import { TwilioSession } from "../../models/TwilioSession";
 
 export const twilioWhatsAppSessionManager = {
-  set(contactWhatsApp: string, session: ActiveWhatsAppSession): void {
-    sessions.set(contactWhatsApp, session);
-    // Auto-cleanup after 24h
-    setTimeout(() => {
-      sessions.delete(contactWhatsApp);
-    }, 24 * 60 * 60 * 1000);
+  async set(contactWhatsApp: string, session: ActiveWhatsAppSession): Promise<void> {
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    
+    await TwilioSession.findOneAndUpdate(
+      { identifier: contactWhatsApp, type: "whatsapp" },
+      {
+        identifier: contactWhatsApp,
+        type: "whatsapp",
+        userId: session.userId,
+        sessionId: session.sessionId,
+        contactName: session.contactName,
+        contactWhatsApp: session.contactWhatsApp,
+        crisisContext: session.crisisContext,
+        conversationHistory: session.conversationHistory,
+        startedAt: session.startedAt,
+        expiresAt,
+      },
+      { upsert: true, new: true }
+    );
   },
 
-  get(contactWhatsApp: string): ActiveWhatsAppSession | undefined {
-    return sessions.get(contactWhatsApp);
+  async get(contactWhatsApp: string): Promise<ActiveWhatsAppSession | undefined> {
+    const session = await TwilioSession.findOne({ identifier: contactWhatsApp, type: "whatsapp" }).lean();
+    if (!session) return undefined;
+    return session as unknown as ActiveWhatsAppSession;
   },
 
-  updateHistory(contactWhatsApp: string, message: { role: "system" | "user" | "assistant"; content: string }): void {
-    const session = sessions.get(contactWhatsApp);
-    if (session) {
-      session.conversationHistory.push(message);
-    }
+  async updateHistory(contactWhatsApp: string, message: { role: "system" | "user" | "assistant"; content: string }): Promise<void> {
+    await TwilioSession.updateOne(
+      { identifier: contactWhatsApp, type: "whatsapp" },
+      { $push: { conversationHistory: message } }
+    );
   },
 
-  delete(contactWhatsApp: string): void {
-    sessions.delete(contactWhatsApp);
+  async delete(contactWhatsApp: string): Promise<void> {
+    await TwilioSession.deleteOne({ identifier: contactWhatsApp, type: "whatsapp" });
   },
 };

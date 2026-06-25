@@ -70,7 +70,7 @@ export async function initiateEmergencyWhatsApp(
       conversationHistory: [],
       startedAt: new Date(),
     };
-    twilioWhatsAppSessionManager.set(contact.whatsappNumber, session);
+    await twilioWhatsAppSessionManager.set(contact.whatsappNumber, session);
 
     logger.info("[TWILIO_WHATSAPP_SENT]", { messageSid: message.sid, to: twilioWhatsAppTo });
     return { success: true, callSid: message.sid };
