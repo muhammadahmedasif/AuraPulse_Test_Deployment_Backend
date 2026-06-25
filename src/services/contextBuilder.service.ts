@@ -1,14 +1,11 @@
 /**
- * Context Builder Service
- * ───────────────────────
  * Assembles the final prompt sent to the LLM.
- * Implements HYBRID memory: always includes BOTH
- * the summary AND recent messages.
+ * Implements HYBRID memory: always includes BOTH the summary AND recent messages.
  */
 
 import { getRecentMessages, formatMessagesForPrompt, SimpleMessage } from "./memory.service";
 
-// ── Behavior Mapping (The precise personality descriptions) ────────
+// Behavior mapping for AI personality
 const BEHAVIOR_MAP = {
   supportive: "empathetic, warm, and understanding",
   friendly: "casual, light-hearted, and conversational",
@@ -16,7 +13,7 @@ const BEHAVIOR_MAP = {
   calm: "slow, grounding, and therapist-like"
 };
 
-// ── Build Base System Prompt ────────────────────────────────────
+// Build base system prompt
 function getBaseSystemPrompt(aiName: string = "Maya", aiBehavior: string = "supportive", messageCount: number = 0): string {
   const behaviorDescription = BEHAVIOR_MAP[aiBehavior as keyof typeof BEHAVIOR_MAP] || BEHAVIOR_MAP.supportive;
 
@@ -62,28 +59,15 @@ IMPORTANT - EMOTIONAL CONTEXT GUIDANCE:
   return prompt;
 }
 
-// ── Validate fusion context string ────────────────────────────────
+// Validate fusion context string
 function isValidFusionContext(value: unknown): value is string {
   return typeof value === "string" && value.trim() !== "";
 }
 
-// ── Max Context Budget ─────────────────────────────────────────
+// Max Context Budget
 const MAX_CONTEXT_CHARS = 3000;
 
-// ── Build Full Prompt ──────────────────────────────────────────
-/**
- * Assembles the complete prompt with hybrid memory:
- *
- * 1. System Prompt (AI personality + emotional guidance instructions)
- * 2. Fusion Emotional Context (if available — overrides standalone latestMood)
- * 3. Long-term Memory (summary — if exists)
- * 4. Short-term Memory (recent messages — ALWAYS included)
- * 5. Current User Message
- *
- * CRITICAL: Never replaces recent messages with summary.
- *           Both are ALWAYS included together.
- *           Fusion context is always preserved even during budget trimming.
- */
+// Build prompt context
 export function buildPrompt(
   userMessage: string,
   allMessages: SimpleMessage[],

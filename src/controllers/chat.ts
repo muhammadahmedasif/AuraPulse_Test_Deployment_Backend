@@ -18,7 +18,7 @@ import { fuseEmotion, buildFusionContext } from "../services/emotionFusion.servi
 import { FusionInput } from "../services/emotionWeights";
 
 
-// ── Default Analysis (until real analysis is implemented) ──────
+// Default analysis fallback
 const defaultAnalysis: MessageAnalysis = {
   emotionalState: "neutral",
   themes: [],
@@ -27,7 +27,7 @@ const defaultAnalysis: MessageAnalysis = {
   progressIndicators: [],
 };
 
-// ── Create Chat Session ────────────────────────────────────────
+// Create a new chat session
 export const createChatSession = async (req: Request, res: Response) => {
   try {
     if (!req.user || !req.user._id) {
@@ -56,14 +56,11 @@ export const createChatSession = async (req: Request, res: Response) => {
     });
   } catch (error) {
     logger.error("Error creating chat session:", error);
-    res.status(500).json({
-      message: "Error creating chat session",
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
-// ── Send Message (CORE — refactored) ───────────────────────────
+// Send a message and stream the AI response
 export const sendMessage = async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
@@ -72,7 +69,7 @@ export const sendMessage = async (req: Request, res: Response) => {
     const userId = req.user._id;
     const userName = req.user.name;
 
-    // ── Instant Response Headers ──
+    // Set streaming headers
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -84,7 +81,7 @@ export const sendMessage = async (req: Request, res: Response) => {
 
     logger.info("Processing chat message", { sessionId, source: messageSource });
 
-    // ── Load session & mood ──
+    // Load session and verify access
     const session = await ChatSession.findOne({ sessionId });
     if (!session) {
       logger.warn("Session not found:", { sessionId });
@@ -102,14 +99,14 @@ export const sendMessage = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "This session has been completed and is locked." });
     }
 
-    // ── Build context with HYBRID memory ──
+    // Build context with hybrid memory
     const allMessages = session.messages.map((m) => ({
       role: m.role,
       content: m.content,
     }));
     const summary = session.summary || "";
 
-    // ── Start Parallel Emotion Analysis ──
+    // Process recent mood data
     const latestMoodDoc = await Mood.findOne({ userId }).sort({ timestamp: -1 });
     let latestMood: "low" | "neutral" | "positive" | "unknown" = "unknown";
     if (latestMoodDoc) {
@@ -121,7 +118,7 @@ export const sendMessage = async (req: Request, res: Response) => {
     const aiName = req.user.aiName || "Maya";
     const aiBehavior = req.user.aiBehavior || "supportive";
 
-    // ── Start Emotion Analysis (Blocking) ──
+    // Analyze user message emotion
     const recentContext = allMessages.slice(-3).map(m => m.content).join(" | ");
     const emotionMeta = await analyzeUserState({
       userMessage: message,
@@ -133,7 +130,7 @@ export const sendMessage = async (req: Request, res: Response) => {
       return null;
     });
 
-    // ── Emotion Fusion ──
+    // Calculate multimodal emotion fusion
     let fusionContextStr: string | undefined;
     try {
       const recentMoods = await Mood.find({ userId })
@@ -166,11 +163,7 @@ export const sendMessage = async (req: Request, res: Response) => {
         sources: fusionResult.sources,
       });
 
-      console.log("\n================ [TEMPORARY FUSION LOG] ================");
-      console.log("Fusion Input:", JSON.stringify(fusionInput, null, 2));
-      console.log("Fusion Result:", JSON.stringify(fusionResult, null, 2));
-      console.log("Injected Context String:\n" + fusionContextStr);
-      console.log("========================================================\n");
+
     } catch (err) {
       logger.warn("Emotion fusion failed, continuing without", {
         error: err instanceof Error ? err.message : String(err),
@@ -179,7 +172,7 @@ export const sendMessage = async (req: Request, res: Response) => {
 
     const prompt = buildPrompt(message, allMessages, summary, userName, latestMood, aiName, aiBehavior, emotionMeta?.suggestedActivity, fusionContextStr);
 
-    // ── Abort on client disconnect ──
+    // Handle client disconnects safely
     const abortController = new AbortController();
     req.on("close", () => {
       if (!res.writableEnded) {
@@ -188,7 +181,7 @@ export const sendMessage = async (req: Request, res: Response) => {
       }
     });
 
-    // ── Generate AI response via router ──
+    // Generate and stream the AI response
     // This starts streaming immediately to res
     const { fullText, modelUsed, fallbackUsed, error: llmError } = await routedGenerateStream(
       prompt,
@@ -213,7 +206,7 @@ export const sendMessage = async (req: Request, res: Response) => {
       replyLength: reply.length,
     });
 
-    // ── Crisis Escalation (async fire-and-forget — NEVER blocks chat) ──────
+    // Evaluate crisis escalation (async, never blocks chat)
     if (emotionMeta) {
       void escalationEngine.evaluate(
         userId.toString(),
@@ -225,7 +218,7 @@ export const sendMessage = async (req: Request, res: Response) => {
     }
 
 
-    // ── Save messages atomically ──
+    // Save user and AI messages atomically
     const updatedSession = await ChatSession.findOneAndUpdate(
       { sessionId, userId },
       {
@@ -270,7 +263,7 @@ export const sendMessage = async (req: Request, res: Response) => {
         messageCount: updatedSession.messages.length,
       });
 
-      // ── Background: Title Generation (Groq) ──
+      // Generate session title in background
       const isDefaultTitle =
         updatedSession.title === "New Session" ||
         updatedSession.title === "New Therapy Session";
@@ -287,7 +280,7 @@ export const sendMessage = async (req: Request, res: Response) => {
           .catch((err) => logger.error("Title generation error", err));
       }
 
-      // ── Background: Summary Update (Groq) ──
+      // Update session summary in background
       const msgCount = updatedSession.messages.length;
       const hasSummary = !!updatedSession.summary;
 
@@ -305,7 +298,7 @@ export const sendMessage = async (req: Request, res: Response) => {
       }
     }
 
-    // ── Send final completion event ──
+    // Send final completion event to stream
     res.write(
       JSON.stringify({
         t: "done",
@@ -327,12 +320,12 @@ export const sendMessage = async (req: Request, res: Response) => {
   } catch (error) {
     logger.error("Error in sendMessage:", error);
     if (!res.headersSent) {
-      res.status(500).json({ message: "Error processing message" });
+      res.status(500).json({ message: "Internal server error" });
     }
   }
 };
 
-// ── Get Chat Session ───────────────────────────────────────────
+// Get a specific chat session
 export const getChatSession = async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
@@ -349,11 +342,11 @@ export const getChatSession = async (req: Request, res: Response) => {
     res.json(chatSession);
   } catch (error) {
     logger.error("Failed to get chat session:", error);
-    res.status(500).json({ error: "Failed to get chat session" });
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
-// ── Get Chat History ───────────────────────────────────────────
+// Get history for a session
 export const getChatHistory = async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
@@ -396,11 +389,11 @@ export const getChatHistory = async (req: Request, res: Response) => {
     res.json(session.messages);
   } catch (error) {
     logger.error("Error fetching chat history:", error);
-    res.status(500).json({ message: "Error fetching chat history" });
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
-// ── Get User Sessions ──────────────────────────────────────────
+// Get all active sessions for user
 export const getUserSessions = async (req: Request, res: Response) => {
   try {
     const userId = req.user._id;
@@ -434,11 +427,11 @@ export const getUserSessions = async (req: Request, res: Response) => {
     res.json(sessionsWithPreview);
   } catch (error) {
     logger.error("Error fetching user sessions:", error);
-    res.status(500).json({ message: "Error fetching user sessions" });
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
-// ── Delete Chat Session ────────────────────────────────────────
+// Delete a chat session
 export const deleteChatSession = async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
@@ -465,6 +458,6 @@ export const deleteChatSession = async (req: Request, res: Response) => {
     res.json({ message: "Chat session deleted successfully" });
   } catch (error) {
     logger.error("Failed to delete chat session:", error);
-    res.status(500).json({ message: "Failed to delete chat session" });
+    res.status(500).json({ message: "Internal server error" });
   }
 };

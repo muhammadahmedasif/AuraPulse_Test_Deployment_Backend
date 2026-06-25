@@ -1,6 +1,5 @@
 /**
  * Emergency Contacts Controller
- * ─────────────────────────────
  * CRUD operations for emergency contacts and consent management.
  * All routes require authentication (via existing auth middleware).
  */
@@ -11,7 +10,7 @@ import { EmergencyContact }  from "../models/EmergencyContact";
 import { EscalationLog }     from "../models/EscalationLog";
 import { logger }            from "../utils/logger";
 
-// ── GET /api/emergency/contacts ────────────────────────────────────────────────
+// Get emergency contacts for user
 export const getEmergencyContacts = async (req: Request, res: Response) => {
   try {
     const userId = req.user._id;
@@ -23,8 +22,7 @@ export const getEmergencyContacts = async (req: Request, res: Response) => {
   }
 };
 
-// ── POST /api/emergency/contacts ───────────────────────────────────────────────
-// Add a single contact
+// Add a single emergency contact
 export const addEmergencyContact = async (req: Request, res: Response) => {
   try {
     const userId = req.user._id;
@@ -70,7 +68,7 @@ export const addEmergencyContact = async (req: Request, res: Response) => {
   }
 };
 
-// ── PUT /api/emergency/contacts/:contactId ─────────────────────────────────────
+// Update an existing emergency contact
 export const updateEmergencyContact = async (req: Request, res: Response) => {
   try {
     const userId    = req.user._id;
@@ -97,7 +95,7 @@ export const updateEmergencyContact = async (req: Request, res: Response) => {
   }
 };
 
-// ── DELETE /api/emergency/contacts/:contactId ──────────────────────────────────
+// Delete an emergency contact
 export const deleteEmergencyContact = async (req: Request, res: Response) => {
   try {
     const userId      = req.user._id;
@@ -118,7 +116,7 @@ export const deleteEmergencyContact = async (req: Request, res: Response) => {
   }
 };
 
-// ── POST /api/emergency/consent ────────────────────────────────────────────────
+// Accept emergency consent
 export const acceptConsent = async (req: Request, res: Response) => {
   try {
     const userId = req.user._id;
@@ -142,14 +140,16 @@ export const acceptConsent = async (req: Request, res: Response) => {
   }
 };
 
-// ── PUT /api/emergency/settings ────────────────────────────────────────────────
+// Update escalation settings
 export const updateEscalationSettings = async (req: Request, res: Response) => {
   try {
     const userId   = req.user._id;
-    const { autoCallEnabled } = req.body;
+    const { autoCallEnabled, cooldownHours, maxPerDay } = req.body;
 
     const update: Record<string, any> = {};
     if (autoCallEnabled !== undefined) update["escalationSettings.autoCallEnabled"] = autoCallEnabled;
+    if (cooldownHours   !== undefined) update["escalationSettings.cooldownHours"]   = cooldownHours;
+    if (maxPerDay       !== undefined) update["escalationSettings.maxPerDay"]       = maxPerDay;
 
     const record = await EmergencyContact.findOneAndUpdate(
       { userId },
@@ -164,7 +164,7 @@ export const updateEscalationSettings = async (req: Request, res: Response) => {
   }
 };
 
-// ── GET /api/emergency/status ──────────────────────────────────────────────────
+// Get escalation status
 export const getEscalationStatus = async (req: Request, res: Response) => {
   try {
     const userId = req.user._id;
@@ -203,7 +203,6 @@ export const getEscalationStatus = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Failed to get escalation status" });
   }
 };
-// ── POST /api/emergency/test-call ─────────────────────────────────────────────
 // Manual trigger for testing the Twilio pipeline
 export const triggerTestCall = async (req: Request, res: Response) => {
   try {
@@ -252,7 +251,7 @@ export const triggerTestCall = async (req: Request, res: Response) => {
     if (result.success) {
       res.json({ message: "Test call initiated", callSid: result.callSid });
     } else {
-      res.status(500).json({ message: "Failed to initiate call", error: result.error });
+      res.status(500).json({ message: "Failed to initiate call" });
     }
   } catch (err) {
     logger.error("triggerTestCall error", { error: String(err) });

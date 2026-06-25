@@ -4,6 +4,7 @@ import { User } from "../models/User";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
+import { logger } from "../utils/logger";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -36,7 +37,8 @@ export const register = async (req: Request, res: Response) => {
       message: "User registered successfully.",
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    logger.error("Registration error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -98,7 +100,8 @@ export const login = async (req: Request, res: Response) => {
       message: "Login successful",
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    logger.error("Login error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -135,7 +138,8 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
     res.status(200).json({ message: "If an account exists, a reset link has been sent." });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    logger.error("Forgot password error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -169,7 +173,8 @@ export const resetPassword = async (req: Request, res: Response) => {
 
     res.status(200).json({ message: "Password has been successfully reset." });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    logger.error("Reset password error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -241,7 +246,7 @@ export const googleAuth = async (req: Request, res: Response) => {
       message: "Google login successful",
     });
   } catch (error) {
-    console.error("Google Auth Error:", error);
-    res.status(500).json({ message: "Failed to authenticate with Google.", error });
+    logger.error("Google Auth Error:", error);
+    res.status(500).json({ message: "Failed to authenticate with Google." });
   }
 };

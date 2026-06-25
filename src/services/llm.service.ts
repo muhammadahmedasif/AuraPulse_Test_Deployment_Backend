@@ -1,11 +1,11 @@
 import Groq from "groq-sdk";
 import { logger } from "../utils/logger";
 
-// ── Configuration ──────────────────────────────────────────────
+// Configuration
 const GROQ_MODEL = "llama-3.1-8b-instant";
 const GROQ_TIMEOUT_MS = 15_000;
 
-// ── SDK Initialization ─────────────────────────────────────────
+// SDK Initialization
 export const groq1 = new Groq({
   apiKey: process.env.GROQ_API_KEY_1 || "",
 });
@@ -13,7 +13,7 @@ export const groq2 = new Groq({
   apiKey: process.env.GROQ_API_KEY_2 || "",
 });
 
-// ── Types ──────────────────────────────────────────────────────
+// Types
 export interface LLMOptions {
   maxTokens?: number;
   temperature?: number;
@@ -80,7 +80,7 @@ export async function generateStream(
         const status = error?.status;
         const message = error?.message?.toLowerCase() || "";
 
-        // ── Error Classification ──
+        // Error Classification
         
         // 1. Timeout -> retry once, then switch
         if (error.name === "AbortError" || message.includes("timeout") || status === 408) {
@@ -123,7 +123,7 @@ export async function generateStream(
   return { fullText: failMsg, modelUsed: "groq", fallbackUsed: true, error: true };
 }
 
-// ── Non-Streaming Generation ───────────────────────────────────
+// Non-Streaming Generation
 /**
  * Used for background tasks (summarization, titles).
  * Also implements dual key failover.

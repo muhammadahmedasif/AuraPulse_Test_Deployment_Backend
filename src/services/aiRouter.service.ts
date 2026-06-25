@@ -1,7 +1,7 @@
 import { logger } from "../utils/logger";
 import { generateStream } from "./llm.service";
 
-// ── Router Result ──────────────────────────────────────────────
+// Router Result
 export interface RouterResult {
   fullText: string;
   modelUsed: "groq";
@@ -9,13 +9,7 @@ export interface RouterResult {
   error?: boolean;
 }
 
-// ── Main Router (Simplified) ───────────────────────────────────
-/**
- * Now delegates everything to llm.service.ts which handles
- * the dual-key Groq failover logic internally.
- * 
- * Maintains signature to avoid breaking chat controller.
- */
+// Main Router
 export async function routedGenerateStream(
   prompt: string,
   onChunk: (text: string) => void,
