@@ -13,6 +13,9 @@ export interface IEscalationLog extends Document {
   callSid?: string;
   outcome: "initiated" | "completed" | "failed" | "blocked";
   error?: string;
+  duration?: number;
+  callStatus?: string;
+  twilioErrorCode?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,6 +37,9 @@ const EscalationLogSchema = new Schema<IEscalationLog>(
       default: "initiated",
     },
     error: { type: String },
+    duration: { type: Number },
+    callStatus: { type: String },
+    twilioErrorCode: { type: String },
   },
   { timestamps: true }
 );

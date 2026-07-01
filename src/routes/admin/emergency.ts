@@ -55,6 +55,9 @@ router.get("/logs", requirePermission("emergency.read"), async (req: Request, re
           callSid: log.callSid,
           outcome: log.outcome,
           error: log.error,
+          duration: log.duration,
+          callStatus: log.callStatus,
+          twilioErrorCode: log.twilioErrorCode,
           createdAt: log.createdAt,
         };
       })

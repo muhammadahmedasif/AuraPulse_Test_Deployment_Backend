@@ -229,20 +229,35 @@ export const handleVoiceRespond = async (req: Request, res: Response): Promise<v
 // ── POST /api/twilio/voice/status — Call status webhook ───────────────────────
 export const handleCallStatus = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { CallSid, CallStatus, CallDuration } = req.body;
-    logger.info("[TWILIO_STATUS_CALLBACK]", { callSid: CallSid, status: CallStatus, duration: CallDuration });
+    const { CallSid, CallStatus, CallDuration, ErrorCode, ErrorMessage } = req.body;
+    logger.info("[TWILIO_STATUS_CALLBACK]", { callSid: CallSid, status: CallStatus, duration: CallDuration, error: ErrorCode });
 
     const callSession = await twilioSessionManager.get(CallSid);
     const userId = callSession?.userId;
 
+    const durationNum = CallDuration ? parseInt(CallDuration) : undefined;
+    const errorText = ErrorMessage || CallStatus;
+
     if (CallStatus === "completed") {
       EscalationLogger.callCompleted({ userId: userId || "unknown", callSid: CallSid });
-      await EscalationLog.findOneAndUpdate({ callSid: CallSid }, { outcome: "completed", duration: CallDuration });
+      await EscalationLog.findOneAndUpdate(
+        { callSid: CallSid },
+        { outcome: "completed", duration: durationNum, callStatus: CallStatus }
+      );
       await twilioSessionManager.delete(CallSid);
     } else if (["failed", "busy", "no-answer", "canceled"].includes(CallStatus)) {
-      EscalationLogger.callFailed({ userId: userId || "unknown", callSid: CallSid, error: CallStatus });
-      await EscalationLog.findOneAndUpdate({ callSid: CallSid }, { outcome: "failed", error: CallStatus });
+      EscalationLogger.callFailed({ userId: userId || "unknown", callSid: CallSid, error: errorText });
+      await EscalationLog.findOneAndUpdate(
+        { callSid: CallSid },
+        { outcome: "failed", error: errorText, duration: durationNum, callStatus: CallStatus, twilioErrorCode: ErrorCode }
+      );
       await twilioSessionManager.delete(CallSid);
+    } else {
+      // In-progress statuses like "ringing", "in-progress"
+      await EscalationLog.findOneAndUpdate(
+        { callSid: CallSid },
+        { callStatus: CallStatus, twilioErrorCode: ErrorCode }
+      );
     }
 
     res.sendStatus(204);

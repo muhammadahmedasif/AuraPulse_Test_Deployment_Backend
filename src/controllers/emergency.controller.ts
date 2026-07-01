@@ -152,16 +152,14 @@ export const acceptConsent = async (req: Request, res: Response) => {
   }
 };
 
-// Update escalation settings
+// Update escalation settings (User can only toggle auto-call opt-in)
 export const updateEscalationSettings = async (req: Request, res: Response) => {
   try {
     const userId   = req.user._id;
-    const { autoCallEnabled, cooldownHours, maxPerDay } = req.body;
+    const { autoCallEnabled } = req.body;
 
     const update: Record<string, any> = {};
     if (autoCallEnabled !== undefined) update["escalationSettings.autoCallEnabled"] = autoCallEnabled;
-    if (cooldownHours   !== undefined) update["escalationSettings.cooldownHours"]   = cooldownHours;
-    if (maxPerDay       !== undefined) update["escalationSettings.maxPerDay"]       = maxPerDay;
 
     const record = await EmergencyContact.findOneAndUpdate(
       { userId },
@@ -222,16 +220,20 @@ export const triggerTestCall = async (req: Request, res: Response) => {
     const { contactId } = req.body;
 
     const record = await EmergencyContact.findOne({ userId });
-    if (!record) return res.status(404).json({ message: "No emergency contacts found" });
+    if (!record) return res.status(404).json({ message: "No emergency contacts configured." });
 
     let contact;
     if (contactId) {
       contact = (record.contacts as Types.DocumentArray<any>).id(contactId);
+      if (!contact) return res.status(404).json({ message: "Requested contact not found." });
     } else {
       contact = record.contacts.find(c => c.enabled);
+      if (!contact) return res.status(404).json({ message: "No enabled contact available for testing." });
     }
 
-    if (!contact) return res.status(404).json({ message: "No suitable contact found" });
+    if (!contact.phone) {
+      return res.status(400).json({ message: `Contact '${contact.name}' is missing a valid phone number.` });
+    }
 
     const { initiateEmergencyCall } = require("../services/twilio/twilio-call.service");
     
@@ -261,12 +263,12 @@ export const triggerTestCall = async (req: Request, res: Response) => {
     });
 
     if (result.success) {
-      res.json({ message: "Test call initiated", callSid: result.callSid });
+      res.json({ message: `Call initiated successfully to ${contact.name} (${contact.phone})`, callSid: result.callSid });
     } else {
-      res.status(500).json({ message: "Failed to initiate call" });
+      res.status(500).json({ message: `Call failed to initiate. Reason: ${result.error || 'Unknown Twilio Error'}` });
     }
-  } catch (err) {
+  } catch (err: any) {
     logger.error("triggerTestCall error", { error: String(err) });
-    res.status(500).json({ message: "Internal server error during test call" });
+    res.status(500).json({ message: `Internal server error during test call: ${err.message}` });
   }
 };
