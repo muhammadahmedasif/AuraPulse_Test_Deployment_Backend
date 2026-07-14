@@ -14,7 +14,7 @@ export interface EmotionAIParams {
 export interface EmotionAIResult {
   emotion: "panic" | "stress" | "low" | "neutral" | "positive";
   intensity: number;
-  suggestedActivity: "breathing" | "ocean" | "forest" | "zen" | null;
+  suggestedActivity: "breathing" | "ocean" | "forest" | "zen" | "rain" | "campfire" | null;
   autoTrigger: boolean;
   // ── Crisis fields (Phase 1 extension) ──────────────────────
   crisisRiskScore?: number;
@@ -23,6 +23,10 @@ export interface EmotionAIResult {
   panicSeverity?: number;
   escalationRecommended?: boolean;
   escalationReason?: string;
+  musicRecommendation?: {
+    mood: string;
+    reason: string;
+  } | null;
 }
 
 // ── Smart Gate ────────────────────────────────────────────────
@@ -84,7 +88,8 @@ function fallbackAnalysis(message: string, latestMood: string): EmotionAIResult 
     return {
       emotion: "low", intensity: 1.0, suggestedActivity: null, autoTrigger: true,
       crisisRiskScore: 0.95, suicideRisk: 0.95, selfHarmRisk: 0.5, panicSeverity: 0.5,
-      escalationRecommended: true, escalationReason: "Critical suicide keywords detected"
+      escalationRecommended: true, escalationReason: "Critical suicide keywords detected",
+      musicRecommendation: null
     };
   }
 
@@ -92,19 +97,24 @@ function fallbackAnalysis(message: string, latestMood: string): EmotionAIResult 
     return {
       emotion: "low", intensity: 0.9, suggestedActivity: null, autoTrigger: true,
       crisisRiskScore: 0.85, suicideRisk: 0.8, selfHarmRisk: 0.7, panicSeverity: 0.4,
-      escalationRecommended: true, escalationReason: "High risk emotional distress keywords"
+      escalationRecommended: true, escalationReason: "High risk emotional distress keywords",
+      musicRecommendation: { mood: "Calm Piano", reason: "Soothe high distress" }
     };
   }
 
   if (hasMedium) {
+    // Rotate through a variety of calming activities including rain and campfire
+    const mediumActivities: ("breathing" | "rain" | "campfire" | "ocean" | "forest")[] = ["breathing", "rain", "campfire", "ocean", "forest"];
+    const activity = mediumActivities[Math.floor(Math.random() * mediumActivities.length)];
     return {
-      emotion: "stress", intensity: 0.75, suggestedActivity: "breathing", autoTrigger: false,
+      emotion: "stress", intensity: 0.75, suggestedActivity: activity, autoTrigger: false,
       crisisRiskScore: 0.5, suicideRisk: 0.2, selfHarmRisk: 0.2, panicSeverity: 0.6,
-      escalationRecommended: false, escalationReason: "Medium distress detected"
+      escalationRecommended: false, escalationReason: "Medium distress detected",
+      musicRecommendation: { mood: "Meditation Music", reason: "Help reduce stress and anxiety" }
     };
   }
 
-  return { emotion: "neutral", intensity: 0.1, suggestedActivity: null, autoTrigger: false };
+  return { emotion: "neutral", intensity: 0.1, suggestedActivity: null, autoTrigger: false, musicRecommendation: null };
 }
 
 // ── Main Analysis Function ─────────────────────────────────────
@@ -120,7 +130,7 @@ SCHEMA:
 {
   "emotion": "panic"|"stress"|"low"|"neutral"|"positive",
   "intensity": 0.0-1.0,
-  "suggestedActivity": "breathing"|"ocean"|"forest"|"zen"|null,
+  "suggestedActivity": "breathing"|"ocean"|"forest"|"zen"|"rain"|"campfire"|null, // CRITICAL: RANDOMIZE THIS! Do not just suggest 'breathing' every time. Pick different ones.
   "autoTrigger": boolean,
   "crisisRiskScore": 0.0-1.0,
   "suicideRisk": 0.0-1.0,
@@ -128,8 +138,14 @@ SCHEMA:
   "panicSeverity": 0.0-1.0,
   "riskLevel": "LOW"|"MEDIUM"|"HIGH"|"CRITICAL",
   "escalationRecommended": boolean,
-  "escalationReason": "string"
-}`;
+  "escalationReason": "string",
+  "musicRecommendation": {
+    "mood": "Calm Piano" | "Nature Sounds" | "Deep Focus" | "Meditation Music" | "Sleep Sounds" | "Positive Acoustic" | "Comfort Music" | "Breathing Music",
+    "reason": "string"
+  } | null
+}
+
+IMPORTANT: To avoid repetitive user experiences, you MUST randomize the "suggestedActivity" and "musicRecommendation" fields. Do NOT always suggest "breathing". Rotate through all available activities and music moods appropriately.`;
 
   const userPrompt = `User Message: "${params.userMessage}"`;
 
@@ -165,6 +181,7 @@ SCHEMA:
         panicSeverity: Number(data.panicSeverity) || 0,
         escalationRecommended: !!data.escalationRecommended || (data.riskLevel === "HIGH" || data.riskLevel === "CRITICAL"),
         escalationReason: data.escalationReason || "Assessment",
+        musicRecommendation: data.musicRecommendation || null,
       };
 
       logger.info("🧠 emotionAI: Analysis Complete", { risk: data.riskLevel, score: finalResult.crisisRiskScore });

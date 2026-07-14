@@ -16,6 +16,7 @@ import { analyzeUserState } from "../services/emotionAI.service";
 import * as escalationEngine from "../services/crisis/escalation-engine.service";
 import { fuseEmotion, buildFusionContext } from "../services/emotionFusion.service";
 import { FusionInput } from "../services/emotionWeights";
+import { getMusicRecommendations } from "../services/spotifyRecommendation.service";
 
 
 // Default analysis fallback
@@ -217,6 +218,29 @@ export const sendMessage = async (req: Request, res: Response) => {
       );
     }
 
+    // Fetch Spotify recommendations if the AI decided to recommend music
+    let spotifyRecommendations: any[] = [];
+    if (emotionMeta && emotionMeta.musicRecommendation) {
+      logger.info(`🎵 Fetching Spotify recommendations for mood: "${emotionMeta.musicRecommendation.mood}"`);
+      spotifyRecommendations = await getMusicRecommendations(emotionMeta.musicRecommendation.mood);
+      logger.info(`🎵 Spotify result: ${spotifyRecommendations.length} playlists returned`);
+
+      if (spotifyRecommendations.length > 0) {
+        try {
+          const { Activity } = require("../models/Activity");
+          await Activity.create({
+            userId,
+            type: "music",
+            name: `Spotify Recommendation: ${emotionMeta.musicRecommendation.mood}`,
+            description: spotifyRecommendations[0]?.title || "Playlist",
+            completed: true,
+            timestamp: new Date()
+          });
+        } catch (actErr) {
+          logger.error("Failed to log music activity", { error: actErr });
+        }
+      }
+    }
 
     // Save user and AI messages atomically
     const updatedSession = await ChatSession.findOneAndUpdate(
@@ -247,6 +271,7 @@ export const sendMessage = async (req: Request, res: Response) => {
                     riskLevel: defaultAnalysis.riskLevel,
                   },
                   emotionMeta,
+                  spotifyRecommendations: spotifyRecommendations.length > 0 ? spotifyRecommendations : undefined,
                   source: messageSource,
                 },
               },
@@ -312,6 +337,7 @@ export const sendMessage = async (req: Request, res: Response) => {
             riskLevel: defaultAnalysis.riskLevel,
           },
           emotionMeta,
+          spotifyRecommendations: spotifyRecommendations.length > 0 ? spotifyRecommendations : undefined,
         },
       }) + "\n"
     );

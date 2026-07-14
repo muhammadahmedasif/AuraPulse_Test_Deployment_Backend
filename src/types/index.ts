@@ -24,7 +24,7 @@ export interface MessageAnalysis {
 export interface EmotionMeta {
   emotion: "panic" | "stress" | "low" | "neutral" | "positive";
   intensity: number;
-  suggestedActivity: "breathing" | "ocean" | "forest" | "zen" | null;
+  suggestedActivity: "breathing" | "ocean" | "forest" | "zen" | "rain" | "campfire" | null;
   autoTrigger: boolean;
   // ── Crisis Extension (Phase 1) ─────────────────────────────
   crisisRiskScore?: number;       // 0.0–1.0 composite risk
@@ -34,6 +34,11 @@ export interface EmotionMeta {
   escalationRecommended?: boolean;
   escalationReason?: string;
   recommendedAction?: string;
+  // ── Spotify Extension ─────────────────────────────
+  musicRecommendation?: {
+    mood: string;
+    reason: string;
+  } | null;
 }
 
 export interface ChatMessage {
@@ -50,6 +55,8 @@ export interface ChatMessage {
       riskLevel?: number;
     };
     emotionMeta?: EmotionMeta | null;
+    spotifyRecommendations?: any[]; // Array of SpotifyPlaylist
+
     source?: "text" | "voice";
   };
 }

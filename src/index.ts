@@ -18,6 +18,7 @@ import emergencyRouter from "./routes/emergency";
 import twilioRouter   from "./routes/twilio";
 import adminRouter    from "./routes/admin";
 import progressRouter from "./routes/progress";
+import musicRouter    from "./routes/music";
 import { connectDB }  from "./utils/db";
 
 // Create Express app
@@ -50,6 +51,7 @@ app.use("/api/emergency", emergencyRouter);
 app.use("/api/twilio",    twilioRouter);
 app.use("/api/admin",     adminRouter);
 app.use("/api/progress",  progressRouter);
+app.use("/api/music",     musicRouter);
 
 // Backward compatibility
 app.use("/auth", authRouter);
@@ -57,6 +59,7 @@ app.use("/chat", chatRouter);
 app.use("/mood", moodRouter);
 app.use("/activity", activityRouter);
 app.use("/user", userRouter);
+app.use("/music",    musicRouter);
 
 // Error handling middleware
 app.use(errorHandler);

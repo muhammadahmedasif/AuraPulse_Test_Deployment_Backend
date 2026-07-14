@@ -29,6 +29,7 @@ const activitySchema = new Schema<IActivity>(
         "journaling",
         "therapy",
         "game",
+        "music",
       ],
     },
     name: {
